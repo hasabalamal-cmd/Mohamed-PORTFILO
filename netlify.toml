@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Handle SPA fallback for React
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Proxy /api/upload to Netlify Function if called locally or deployed
+[[redirects]]
+  from = "/api/upload"
+  to = "/.netlify/functions/upload-to-drive"
+  status = 200
