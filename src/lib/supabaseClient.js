@@ -7,18 +7,19 @@ import {
 } from './initialSeed';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabasePublishableKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 // Validate if real Supabase keys are provided
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
-  supabaseAnonKey &&
+  supabasePublishableKey &&
   !supabaseUrl.includes('your-project-ref') &&
-  !supabaseAnonKey.includes('your_anon_key')
+  !supabasePublishableKey.includes('your_publishable_key')
 );
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabasePublishableKey)
   : null;
 
 // Local storage fallback helpers for smooth testing & standalone demonstration
