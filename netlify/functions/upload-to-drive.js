@@ -1,158 +1,274 @@
 // netlify/functions/upload-to-drive.js
-// Netlify Serverless Function for uploading images securely to Google Drive API
-import { google } from 'googleapis';
-import { Readable } from 'stream';
+
+import { google } from "googleapis";
+import { Readable } from "stream";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-export const handler = async (event, context) => {
-  // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
+export const handler = async (event) => {
+  // =========================
+  // CORS
+  // =========================
+
+  if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ message: 'CORS Preflight OK' }),
+      body: JSON.stringify({
+        message: "CORS Preflight OK",
+      }),
     };
   }
 
-  if (event.httpMethod !== 'POST') {
+  // =========================
+  // Only POST
+  // =========================
+
+  if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Method Not Allowed. Use POST.' }),
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        error: "Method Not Allowed. Use POST.",
+      }),
     };
   }
 
   try {
-    const payload = JSON.parse(event.body || '{}');
-    const { fileName, mimeType, base64Data, folderId } = payload;
+    // =========================
+    // Read request
+    // =========================
+
+    const payload = JSON.parse(event.body || "{}");
+
+    const {
+      fileName,
+      mimeType,
+      base64Data,
+      folderId,
+    } = payload;
 
     if (!base64Data || !fileName) {
       return {
         statusCode: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing required fields: fileName or base64Data' }),
-      };
-    }
-
-    // Clean base64 string if it contains data URL prefix
-    const cleanBase64 = base64Data.replace(/^data:[a-zA-Z0-9\/\+]+;base64,/, '');
-    const buffer = Buffer.from(cleanBase64, 'base64');
-    const bufferStream = new Readable();
-    bufferStream.push(buffer);
-    bufferStream.push(null);
-
-    // Retrieve environment variables
-    const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-    let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-    const targetFolderId = folderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
-
-    // OAuth2 fallback credentials
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-    let authClient = null;
-
-    // 1. Service Account Authentication (Preferred for background servers)
-    if (clientEmail && privateKey) {
-      // Fix potential escaped newlines from environment variable strings
-      if (privateKey.includes('\\n')) {
-        privateKey = privateKey.replace(/\\n/g, '\n');
-      }
-
-      authClient = new google.auth.JWT(
-        clientEmail,
-        null,
-        privateKey,
-        ['https://www.googleapis.com/auth/drive']
-      );
-    } 
-    // 2. OAuth2 Refresh Token Authentication
-    else if (clientId && clientSecret && refreshToken) {
-      const oauth2Client = new google.auth.OAuth2(
-        clientId,
-        clientSecret,
-        'https://developers.google.com/oauthplayground'
-      );
-      oauth2Client.setCredentials({ refresh_token: refreshToken });
-      authClient = oauth2Client;
-    } 
-    else {
-      // If server credentials are not yet configured in Netlify environment variables
-      return {
-        statusCode: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          error: 'Google Drive credentials are not configured in Netlify Environment Variables.',
-          details: 'Please set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY (or GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) in your Netlify Site Settings.',
+          error:
+            "Missing required fields: fileName or base64Data",
         }),
       };
     }
 
-    const drive = google.drive({ version: 'v3', auth: authClient });
+    // =========================
+    // Clean Base64
+    // =========================
 
-    // File metadata
+    const cleanBase64 = base64Data.replace(
+      /^data:[^;]+;base64,/,
+      ""
+    );
+
+    const buffer = Buffer.from(cleanBase64, "base64");
+
+    const bufferStream = Readable.from(buffer);
+
+    // =========================
+    // Environment Variables
+    // =========================
+
+    const clientEmail =
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+
+    let privateKey =
+      process.env.GOOGLE_PRIVATE_KEY;
+
+    const targetFolderId =
+      folderId ||
+      process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+    // =========================
+    // Validate Google credentials
+    // =========================
+
+    if (!clientEmail || !privateKey) {
+      return {
+        statusCode: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          error:
+            "Google Drive credentials are not configured.",
+          details:
+            "Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_PRIVATE_KEY.",
+        }),
+      };
+    }
+
+    if (!targetFolderId) {
+      return {
+        statusCode: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          error:
+            "GOOGLE_DRIVE_FOLDER_ID is not configured.",
+        }),
+      };
+    }
+
+    // =========================
+    // Fix Private Key
+    // =========================
+
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    // =========================
+    // Google Authentication
+    // =========================
+
+    const authClient = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey,
+      scopes: [
+        "https://www.googleapis.com/auth/drive",
+      ],
+    });
+
+    const drive = google.drive({
+      version: "v3",
+      auth: authClient,
+    });
+
+    // =========================
+    // File Name
+    // =========================
+
+    const safeFileName = fileName
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    const finalFileName =
+      `${Date.now()}_${safeFileName}`;
+
+    // =========================
+    // File Metadata
+    // =========================
+
     const fileMetadata = {
-      name: `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-      parents: targetFolderId ? [targetFolderId] : undefined,
+      name: finalFileName,
+      parents: [targetFolderId],
     };
 
+    // =========================
+    // File Media
+    // =========================
+
     const media = {
-      mimeType: mimeType || 'image/jpeg',
+      mimeType: mimeType || "image/jpeg",
       body: bufferStream,
     };
 
-    // Upload file to Google Drive
+    // =========================
+    // Upload to Google Drive
+    // =========================
+
     const uploadRes = await drive.files.create({
-      resource: fileMetadata,
-      media: media,
-      fields: 'id, name, webViewLink, webContentLink',
+      requestBody: fileMetadata,
+      media,
+      fields:
+        "id,name,mimeType,webViewLink,webContentLink",
     });
 
     const fileId = uploadRes.data.id;
 
-    // Make file publicly readable so it can be loaded in web portfolio <img> tags
-    try {
-      await drive.permissions.create({
-        fileId: fileId,
-        requestBody: {
-          role: 'reader',
-          type: 'anyone',
-        },
-      });
-    } catch (permError) {
-      console.warn('Warning: Could not set public permission on Drive file:', permError.message);
+    if (!fileId) {
+      throw new Error(
+        "Google Drive did not return a file ID."
+      );
     }
 
-    // Direct Google CDN image URLs for reliable display in web browsers:
-    // https://lh3.googleusercontent.com/d/FILE_ID or drive.google.com thumbnail
-    const directImageUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
-    const fallbackDirectUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // =========================
+    // Public Permission
+    // =========================
+
+    try {
+      await drive.permissions.create({
+        fileId,
+        requestBody: {
+          role: "reader",
+          type: "anyone",
+        },
+      });
+    } catch (permissionError) {
+      console.warn(
+        "Could not make file public:",
+        permissionError.message
+      );
+    }
+
+    // =========================
+    // Image URLs
+    // =========================
+
+    const directImageUrl =
+      `https://lh3.googleusercontent.com/d/${fileId}`;
+
+    const fallbackDirectUrl =
+      `https://drive.google.com/uc?export=view&id=${fileId}`;
+
+    // =========================
+    // Success
+    // =========================
 
     return {
       statusCode: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         success: true,
-        fileId: fileId,
+        fileId,
         fileName: uploadRes.data.name,
+        mimeType: uploadRes.data.mimeType,
         imageUrl: directImageUrl,
         fallbackUrl: fallbackDirectUrl,
-        webViewLink: uploadRes.data.webViewLink,
+        webViewLink:
+          uploadRes.data.webViewLink || null,
+        webContentLink:
+          uploadRes.data.webContentLink || null,
       }),
     };
   } catch (error) {
-    console.error('Google Drive Upload Error:', error);
+    console.error(
+      "Google Drive Upload Error:",
+      error
+    );
+
     return {
       statusCode: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        error: error.message || 'Internal Server Error during upload',
+        success: false,
+        error:
+          error?.message ||
+          "Internal Server Error during upload",
       }),
     };
   }
