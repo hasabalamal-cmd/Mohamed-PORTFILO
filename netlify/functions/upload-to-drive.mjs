@@ -46,7 +46,23 @@ export const handler = async (event) => {
     // Read request
     // =========================
 
-    const payload = JSON.parse(event.body || "{}");
+    let payload = {};
+
+    try {
+      payload = JSON.parse(event.body || "{}");
+    } catch {
+      return {
+        statusCode: 400,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          success: false,
+          error: "Invalid JSON request body.",
+        }),
+      };
+    }
 
     const {
       fileName,
@@ -78,10 +94,9 @@ export const handler = async (event) => {
     // Clean Base64
     // =========================
 
-    const cleanBase64 = base64Data.replace(
-      /^data:[^;]+;base64,/,
-      ""
-    );
+    const cleanBase64 = String(base64Data)
+      .replace(/^data:[^;]+;base64,/i, "")
+      .replace(/\s/g, "");
 
     const buffer = Buffer.from(cleanBase64, "base64");
 
@@ -120,7 +135,7 @@ export const handler = async (event) => {
     // Validate credentials
     // =========================
 
-    if (!clientEmail || !rawPrivateKey) {
+    if (!clientEmail) {
       return {
         statusCode: 500,
         headers: {
@@ -130,9 +145,22 @@ export const handler = async (event) => {
         body: JSON.stringify({
           success: false,
           error:
-            "Google Drive credentials are not configured.",
-          details:
-            "Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_PRIVATE_KEY.",
+            "GOOGLE_SERVICE_ACCOUNT_EMAIL is not configured.",
+        }),
+      };
+    }
+
+    if (!rawPrivateKey) {
+      return {
+        statusCode: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          success: false,
+          error:
+            "GOOGLE_PRIVATE_KEY is not configured.",
         }),
       };
     }
@@ -156,58 +184,154 @@ export const handler = async (event) => {
     // Prepare Private Key
     // =========================
 
-    /*
-      Supports both:
-      1. Direct PEM private key
-      2. Full Google service-account JSON
-    */
+    let privateKey = String(rawPrivateKey).trim();
 
-    try {
-      const trimmedKey = rawPrivateKey.trim();
+    // -----------------------------------------
+    // Case 1:
+    // GOOGLE_PRIVATE_KEY contains full JSON
+    // -----------------------------------------
 
-      if (trimmedKey.startsWith("{")) {
-        const parsedKey = JSON.parse(trimmedKey);
+    if (privateKey.startsWith("{")) {
+      try {
+        const parsedKey = JSON.parse(privateKey);
 
-        if (parsedKey.private_key) {
-          rawPrivateKey = parsedKey.private_key;
+        if (
+          parsedKey &&
+          typeof parsedKey.private_key === "string"
+        ) {
+          privateKey = parsedKey.private_key;
+        } else {
+          throw new Error(
+            "JSON does not contain private_key."
+          );
         }
+      } catch (jsonError) {
+        console.error(
+          "Failed to parse GOOGLE_PRIVATE_KEY JSON:",
+          jsonError?.message || jsonError
+        );
+
+        throw new Error(
+          "GOOGLE_PRIVATE_KEY contains invalid JSON."
+        );
       }
-    } catch (jsonError) {
-      console.warn(
-        "GOOGLE_PRIVATE_KEY is not JSON. Treating it as PEM."
-      );
     }
 
+    // -----------------------------------------
     // Remove accidental surrounding quotes
-    let privateKey = rawPrivateKey
-      .trim()
-      .replace(/^["']/, "")
-      .replace(/["']$/, "");
+    // -----------------------------------------
 
-    // Convert escaped newlines to real newlines
-    privateKey = privateKey.replace(/\\n/g, "\n");
-
-    // Normalize Windows line endings
-    privateKey = privateKey.replace(/\r/g, "");
-
-    // Remove accidental spaces before/after
     privateKey = privateKey.trim();
 
-    // =========================
-    // Validate Private Key
-    // =========================
+    if (
+      (privateKey.startsWith('"') &&
+        privateKey.endsWith('"')) ||
+      (privateKey.startsWith("'") &&
+        privateKey.endsWith("'"))
+    ) {
+      privateKey = privateKey.slice(1, -1);
+    }
 
-    if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
+    // -----------------------------------------
+    // Convert escaped \n to real new lines
+    // -----------------------------------------
+
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    // -----------------------------------------
+    // Normalize line endings
+    // -----------------------------------------
+
+    privateKey = privateKey.replace(/\r\n/g, "\n");
+    privateKey = privateKey.replace(/\r/g, "\n");
+
+    privateKey = privateKey.trim();
+
+    // -----------------------------------------
+    // Expected PEM markers
+    // -----------------------------------------
+
+    const beginMarker =
+      "-----BEGIN PRIVATE KEY-----";
+
+    const endMarker =
+      "-----END PRIVATE KEY-----";
+
+    // -----------------------------------------
+    // Find PEM markers
+    // -----------------------------------------
+
+    const beginIndex =
+      privateKey.indexOf(beginMarker);
+
+    const endIndex =
+      privateKey.indexOf(endMarker);
+
+    if (beginIndex === -1) {
       throw new Error(
         "GOOGLE_PRIVATE_KEY does not contain a valid BEGIN PRIVATE KEY header."
       );
     }
 
-    if (!privateKey.includes("-----END PRIVATE KEY-----")) {
+    if (endIndex === -1) {
       throw new Error(
         "GOOGLE_PRIVATE_KEY does not contain a valid END PRIVATE KEY footer."
       );
     }
+
+    if (endIndex <= beginIndex) {
+      throw new Error(
+        "GOOGLE_PRIVATE_KEY has an invalid PEM structure."
+      );
+    }
+
+    // -----------------------------------------
+    // Extract only the Base64 body
+    // -----------------------------------------
+
+    const keyBody = privateKey
+      .slice(
+        beginIndex + beginMarker.length,
+        endIndex
+      )
+      .replace(/\s+/g, "");
+
+    if (!keyBody) {
+      throw new Error(
+        "GOOGLE_PRIVATE_KEY contains an empty private key body."
+      );
+    }
+
+    // -----------------------------------------
+    // Rebuild PEM with 64-character lines
+    // -----------------------------------------
+
+    const keyLines =
+      keyBody.match(/.{1,64}/g) || [];
+
+    privateKey =
+      `${beginMarker}\n` +
+      keyLines.join("\n") +
+      `\n${endMarker}\n`;
+
+    // -----------------------------------------
+    // Safe diagnostics
+    // NEVER log the private key itself
+    // -----------------------------------------
+
+    console.log(
+      "Google private key diagnostics:",
+      {
+        length: privateKey.length,
+        bodyLength: keyBody.length,
+        startsCorrectly:
+          privateKey.startsWith(beginMarker),
+        endsCorrectly:
+          privateKey.trim().endsWith(endMarker),
+        newlineCount:
+          (privateKey.match(/\n/g) || []).length,
+      }
+    );
 
     // =========================
     // Google Authentication
@@ -262,6 +386,11 @@ export const handler = async (event) => {
     // Upload to Google Drive
     // =========================
 
+    console.log(
+      "Uploading file to Google Drive:",
+      finalFileName
+    );
+
     const uploadRes = await drive.files.create({
       requestBody: fileMetadata,
       media,
@@ -277,6 +406,11 @@ export const handler = async (event) => {
       );
     }
 
+    console.log(
+      "Google Drive upload successful:",
+      fileId
+    );
+
     // =========================
     // Make File Public
     // =========================
@@ -289,10 +423,15 @@ export const handler = async (event) => {
           type: "anyone",
         },
       });
+
+      console.log(
+        "Google Drive file permission set to public."
+      );
     } catch (permissionError) {
       console.warn(
         "Could not make file public:",
-        permissionError?.message || permissionError
+        permissionError?.message ||
+          permissionError
       );
     }
 
@@ -319,7 +458,9 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         fileId,
-        fileName: uploadRes?.data?.name || finalFileName,
+        fileName:
+          uploadRes?.data?.name ||
+          finalFileName,
         mimeType:
           uploadRes?.data?.mimeType ||
           mimeType ||
@@ -327,9 +468,11 @@ export const handler = async (event) => {
         imageUrl: directImageUrl,
         fallbackUrl: fallbackDirectUrl,
         webViewLink:
-          uploadRes?.data?.webViewLink || null,
+          uploadRes?.data?.webViewLink ||
+          null,
         webContentLink:
-          uploadRes?.data?.webContentLink || null,
+          uploadRes?.data?.webContentLink ||
+          null,
       }),
     };
   } catch (error) {
