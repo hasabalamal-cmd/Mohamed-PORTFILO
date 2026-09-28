@@ -1,6 +1,6 @@
 /* ==============================================================================
-   LENSO PHOTOGRAPHY - MAIN STYLESHEET
-   Matching the Lenso Photography template design exactly.
+   MFM PHOTOGRAPHY - MAIN STYLESHEET
+   MFM Photography visual design.
    ============================================================================== */
 
 /* ------------------------------------------------------------------------------
@@ -165,68 +165,6 @@
   width: 100%;
 }
 
-.dropdown-parent {
-  position: relative;
-}
-
-.dropdown-trigger {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.dropdown-caret {
-  transition: transform 0.2s ease;
-}
-
-.dropdown-parent.open .dropdown-caret {
-  transform: rotate(180deg);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .dropdown-parent:hover .dropdown-caret {
-    transform: rotate(180deg);
-  }
-}
-
-.nav-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  inset-inline-start: 0;
-  background-color: #141414;
-  border: 1px solid #262626;
-  border-radius: 4px;
-  padding: 10px 0;
-  min-width: 190px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  z-index: 110;
-  animation: fadeIn 0.2s ease;
-}
-
-.nav-dropdown-menu a,
-.nav-dropdown-menu button {
-  padding: 9px 18px;
-  color: #cccccc;
-  text-decoration: none;
-  font-size: 0.82rem;
-  font-weight: 500;
-  text-align: start;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: var(--transition-smooth);
-  width: 100%;
-}
-
-.nav-dropdown-menu a:hover,
-.nav-dropdown-menu button:hover {
-  background-color: #202020;
-  color: var(--accent-gold);
-  padding-inline-start: 22px;
-}
-
 /* Nav Actions */
 .nav-actions {
   position: relative;
@@ -235,30 +173,6 @@
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-}
-
-.nav-cta-btn {
-  display: none; /* enabled on wide desktop screens only */
-  align-items: center;
-  gap: 8px;
-  background-color: var(--accent-gold);
-  border: 1px solid var(--accent-gold);
-  color: #101010;
-  font-family: var(--font-sans);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 9px 16px;
-  border-radius: 3px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: var(--transition-smooth);
-}
-
-.nav-cta-btn:hover {
-  background-color: transparent;
-  color: var(--accent-gold);
 }
 
 .nav-icon-btn {
@@ -494,6 +408,10 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.drawer-booking-btn {
+  width: 100%;
 }
 
 .drawer-language-btn:hover {
@@ -1015,68 +933,15 @@
 
 .about-main-image {
   position: relative;
-  width: 82%;
-  height: 460px;
+  width: 100%;
+  aspect-ratio: 1177 / 768;
   border-radius: 4px;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
 }
 
 .about-main-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.award-floating-badge {
-  position: absolute;
-  bottom: 24px;
-  left: 24px;
-  background-color: rgba(13, 13, 13, 0.92);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(212, 165, 94, 0.4);
-  padding: 14px 20px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-}
-
-.award-icon-box {
-  color: var(--accent-gold);
-}
-
-.award-number {
   display: block;
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #ffffff;
-  line-height: 1;
-}
-
-.award-label {
-  display: block;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent-gold);
-  margin-top: 3px;
-}
-
-.about-inset-image {
-  position: absolute;
-  bottom: -25px;
-  right: -20px;
-  width: 52%;
-  height: 230px;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 5px solid #ffffff;
-  box-shadow: var(--shadow-lg);
-}
-
-.about-inset-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1420,7 +1285,7 @@
 
 .footer-columns-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1.3fr 1fr 1fr 1.4fr;
+  grid-template-columns: 1.5fr 1.3fr 1fr 1.4fr;
   gap: 40px;
   padding-bottom: 70px;
 }
@@ -1609,10 +1474,15 @@
 
 .footer-bottom-inner {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
+}
+
+.copyright-text {
+  width: 100%;
+  text-align: center;
 }
 
 .legal-links {
@@ -1633,16 +1503,6 @@
 
 .legal-separator {
   color: #333333;
-}
-
-.footer-admin-trigger {
-  background: none;
-  border: none;
-  color: var(--accent-gold);
-  font-size: 0.78rem;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
 }
 
 .modal-close-btn {
@@ -1686,6 +1546,14 @@
   justify-content: center;
   padding: 24px;
   direction: rtl; /* Clean Arabic Dashboard layout */
+}
+
+.admin-auth-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--accent-gold);
+  font-size: 1rem;
 }
 
 .admin-container {
@@ -2340,37 +2208,6 @@
   padding: 7px 12px;
 }
 
-.nav-login-icon-btn,
-.nav-logout-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #e5e5e5;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.nav-login-icon-btn:hover {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
-}
-
-.nav-logout-btn {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #f87171;
-}
-
-.nav-logout-btn:hover {
-  background: #ef4444;
-  color: #ffffff;
-}
-
 .btn-admin-logout-top {
   display: inline-flex;
   align-items: center;
@@ -2436,44 +2273,6 @@
   font-size: 0.9rem;
 }
 
-.login-demo-helper {
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px dashed #2a2a2a;
-  text-align: center;
-}
-
-.demo-credentials-box {
-  font-size: 0.78rem;
-  color: #888888;
-  margin-bottom: 10px;
-}
-
-.demo-credentials-box code {
-  color: var(--accent-gold);
-  background: #1e1e1e;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
-.btn-demo-quick {
-  background: none;
-  border: 1px solid var(--accent-gold);
-  color: var(--accent-gold);
-  padding: 7px 16px;
-  border-radius: 20px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.btn-demo-quick:hover {
-  background: var(--accent-gold);
-  color: #000000;
-}
-
 .mobile-lang-row {
   display: flex;
   align-items: center;
@@ -2510,13 +2309,6 @@
 /* ------------------------------------------------------------------------------
    RESPONSIVE DESIGN (DESKTOP → TABLET → PHONE)
    ------------------------------------------------------------------------------ */
-
-/* Large desktop: booking CTA becomes visible in the header */
-@media (min-width: 1200px) {
-  .nav-cta-btn {
-    display: inline-flex;
-  }
-}
 
 /* Desktop-only elements (drawer & mobile toggles are hidden above the tablet breakpoint) */
 @media (min-width: 1025px) {
@@ -2617,14 +2409,6 @@
 
   .nav-actions {
     gap: 4px;
-  }
-
-  .nav-login-icon-btn,
-  .nav-logout-btn {
-    justify-content: center;
-    min-width: 40px;
-    min-height: 40px;
-    padding: 7px;
   }
 
   .navbar-search-overlay {
@@ -2766,15 +2550,6 @@
   }
 
   /* --- About ---------------------------------------------------------- */
-  .about-main-image {
-    width: 100%;
-    height: 340px;
-  }
-
-  .about-inset-image {
-    display: none;
-  }
-
   .about-stats-column {
     padding: 24px 20px;
   }
@@ -4161,4 +3936,3 @@
     height: 34px;
   }
 }
-

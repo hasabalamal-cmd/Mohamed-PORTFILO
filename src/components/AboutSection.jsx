@@ -1,38 +1,19 @@
 import React from 'react';
-import { Trophy, Camera, Star, Heart } from 'lucide-react';
+import { Camera, Star, Heart } from 'lucide-react';
+import aboutImage from '../assets/about-ayman.jpeg';
 
 export default function AboutSection({ t }) {
   return (
     <section id="about" className="lenso-about-section">
       <div className="container about-grid-layout">
-        {/* 1. Left: Overlapping Photos & Floating Award Badge */}
+        {/* 1. Left: Featured Image */}
         <div className="about-visual-column">
           <div className="about-images-wrapper">
-            {/* Primary Main Image: Photographer in action */}
             <div className="about-main-image">
               <img
-                src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=800&q=85"
-                alt="Photographer with camera"
-                loading="lazy"
-              />
-              {/* Floating Award Badge */}
-              <div className="award-floating-badge">
-                <div className="award-icon-box">
-                  <Trophy size={28} className="trophy-icon" />
-                </div>
-                <div className="award-text-box">
-                  <span className="award-number">120+</span>
-                  <span className="award-label">{t('awards_won')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Secondary Overlapping Inset Image: Camera Gear & Lenses */}
-            <div className="about-inset-image">
-              <img
-                src="https://images.unsplash.com/photo-1617005082133-548c4dd27f35?auto=format&fit=crop&w=600&q=85"
-                alt="Camera lenses and equipment"
-                loading="lazy"
+                src={aboutImage}
+                alt="Together We Rise event in a photography studio"
+                fetchPriority="high"
               />
             </div>
           </div>

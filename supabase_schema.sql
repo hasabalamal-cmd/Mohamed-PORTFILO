@@ -1,5 +1,5 @@
 -- ==============================================================================
--- LENSO PHOTOGRAPHY - SUPABASE DATABASE SCHEMA
+-- MFM PHOTOGRAPHY - SUPABASE DATABASE SCHEMA
 -- ==============================================================================
 -- This script sets up tables, constraints, indexes, RLS policies, and seed data.
 -- Run this in your Supabase SQL Editor.
@@ -166,7 +166,7 @@ TO authenticated
 USING (true);
 
 -- ==============================================================================
--- 5. SEED DATA (INITIAL DEMO DATA MATCHING LENSO DESIGN)
+-- 5. SEED DATA (INITIAL DEMO DATA FOR MFM)
 -- ==============================================================================
 DO $$
 DECLARE
@@ -193,7 +193,7 @@ BEGIN
         (cat_architecture, 'Architecture'),
         (cat_products, 'Products');
 
-    -- Insert Projects with high-resolution thematic images matching the Lenso design
+    -- Insert Projects with high-resolution thematic images for the MFM portfolio
     INSERT INTO projects (id, name, cover_image, category_id) VALUES
         (proj_weddings, 'Eternal Vows & Grace', 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=85', cat_weddings),
         (proj_portraits, 'Elegance In Shadows', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=85', cat_portraits),

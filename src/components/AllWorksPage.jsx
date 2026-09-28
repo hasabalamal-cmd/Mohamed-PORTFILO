@@ -8,8 +8,6 @@ import {
   Grid3x3,
   Camera,
   Image as ImageIcon,
-  CalendarCheck,
-  Sparkles,
   ImageOff,
 } from 'lucide-react';
 
@@ -22,7 +20,6 @@ export default function AllWorksPage({
   loading = false,
   initialCategoryId = 'all',
   initialQuery = '',
-  onBookSession,
   t,
 }) {
   const [categoryId, setCategoryId] = useState(initialCategoryId || 'all');
@@ -48,11 +45,6 @@ export default function AllWorksPage({
     setSort(nextSort);
     setVisible(PAGE_SIZE);
   };
-
-  const totalPhotos = useMemo(
-    () => Object.values(imageCounts).reduce((sum, value) => sum + (value || 0), 0),
-    [imageCounts],
-  );
 
   const filteredProjects = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -97,24 +89,6 @@ export default function AllWorksPage({
             <span>{t('breadcrumb_works')}</span>
           </nav>
 
-          <span className="section-subtitle">{t('our_work')}</span>
-          <h1 className="works-title">{t('all_works_title')}</h1>
-          <p className="works-subtitle">{t('all_works_subtitle')}</p>
-
-          <div className="works-stats">
-            <div className="works-stat">
-              <strong>{projects.length}</strong>
-              <span>{t('projects_total')}</span>
-            </div>
-            <div className="works-stat">
-              <strong>{categories.length}</strong>
-              <span>{t('categories_total')}</span>
-            </div>
-            <div className="works-stat">
-              <strong>{totalPhotos}</strong>
-              <span>{t('photos_total')}</span>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -280,25 +254,6 @@ export default function AllWorksPage({
               </button>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* ---------------- Bottom call to action ---------------- */}
-      <section className="works-cta">
-        <div className="container works-cta-inner">
-          <div className="works-cta-text">
-            <span className="section-subtitle">{t('book_session')}</span>
-            <h2 className="works-cta-title">{t('works_cta_title')}</h2>
-            <p className="works-cta-desc">{t('works_cta_desc')}</p>
-          </div>
-          <div className="works-cta-actions">
-            <button type="button" className="btn-gold" onClick={onBookSession}>
-              <CalendarCheck size={16} /> {t('book_session')}
-            </button>
-            <a href="#home" className="btn-outline-white">
-              <Sparkles size={16} /> {t('back_to_home')}
-            </a>
-          </div>
         </div>
       </section>
 

@@ -28,7 +28,6 @@ const STORAGE_KEYS = {
   PROJECTS: 'lenso_projects',
   PROJECT_IMAGES: 'lenso_project_images',
   EQUIPMENT: 'lenso_equipment',
-  IS_ADMIN: 'lenso_admin_logged_in',
 };
 
 const getLocal = (key, fallback) => {

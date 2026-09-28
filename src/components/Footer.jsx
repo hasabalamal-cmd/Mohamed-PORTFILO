@@ -42,7 +42,7 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
-export default function Footer({ onOpenAdmin, t, lang }) {
+export default function Footer({ t }) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -171,58 +171,13 @@ export default function Footer({ onOpenAdmin, t, lang }) {
 
             <ul className="footer-links-list">
               <li><a href="#about">{t('about')}</a></li>
-              <li><a href="#features">{t('services')}</a></li>
               <li><a href="#portfolio">{t('portfolio')}</a></li>
               <li><a href="#equipment">{t('gear')}</a></li>
-              <li><a href="#testimonials">{t('what_clients_say')}</a></li>
               <li><a href="#contact">{t('contact')}</a></li>
             </ul>
           </div>
 
-          {/* Column 4: Services */}
-          <div className="footer-col col-services">
-            <h4 className="footer-heading">{t('services')}</h4>
-
-            <ul className="footer-links-list">
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'تصوير الأعراس والزفاف' : 'Wedding Photography'}
-                </a>
-              </li>
-
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'تصوير البورتريه الفاخر' : 'Portrait Photography'}
-                </a>
-              </li>
-
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'التصوير الإعلاني والتجاري' : 'Commercial Photography'}
-                </a>
-              </li>
-
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'تغطية الفعاليات والمناسبات' : 'Event Photography'}
-                </a>
-              </li>
-
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'تصوير المنتجات الاحترافي' : 'Product Photography'}
-                </a>
-              </li>
-
-              <li>
-                <a href="#portfolio">
-                  {lang === 'ar' ? 'تصوير المباني والتصميم الداخلي' : 'Architectural Shoots'}
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 5: Contact Us */}
+          {/* Column 4: Contact Us */}
           <div className="footer-col col-contact">
             <h4 className="footer-heading">{t('contact_info_title')}</h4>
 
@@ -230,7 +185,7 @@ export default function Footer({ onOpenAdmin, t, lang }) {
               <li>
                 <MapPin size={17} className="contact-icon text-gold" />
                 <span>
-                  304 Al Yarmouk St, Al Yarmouk, Riyadh 13251, Saudi Arabia
+                   Riyadh , Saudi Arabia
                 </span>
               </li>
 
@@ -269,26 +224,20 @@ export default function Footer({ onOpenAdmin, t, lang }) {
         <div className="container footer-bottom-inner">
 
           <p className="copyright-text">
-            © {new Date().getFullYear()} MFM Photographer.{' '}
+            © {new Date().getFullYear()} Ayman Dammag.{' '}
             {t('all_rights_reserved')}
           </p>
 
-          <div className="legal-links">
+          {/* <div className="legal-links">
             <a href="#privacy">{t('privacy_policy')}</a>
-
+Riyadh , Saudi Arabia
             <span className="legal-separator">|</span>
 
             <a href="#terms">{t('terms_conditions')}</a>
 
             <span className="legal-separator">|</span>
 
-            <button
-              onClick={onOpenAdmin}
-              className="footer-admin-trigger"
-            >
-              {t('admin_portal')}
-            </button>
-          </div>
+          </div> */}
 
         </div>
       </div>

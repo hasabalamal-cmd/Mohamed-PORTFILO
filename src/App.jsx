@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import FeaturesBar from './components/FeaturesBar';
 import PortfolioSection from './components/PortfolioSection';
 import AboutSection from './components/AboutSection';
 import EquipmentSection from './components/EquipmentSection';
-import TestimonialsSection from './components/TestimonialsSection';
 import Footer from './components/Footer';
 import AllWorksPage from './components/AllWorksPage';
 import ProjectGalleryViewer from './components/ProjectGalleryViewer';
@@ -17,6 +15,8 @@ import {
   getEquipment,
   getAllProjectImages,
   getProjectById,
+  isSupabaseConfigured,
+  supabase,
 } from './lib/supabaseClient';
 import { translations } from './lib/translations';
 import './App.css';
@@ -27,9 +27,14 @@ import './App.css';
    #/works?cat=…&q=…  → all works page pre-filtered (nav dropdown / search box)
    #/project/<id>     → professional photo gallery of one project
    #home / #about …   → home page + in-page section
+   /admin             → administration login and dashboard
 --------------------------------------------------------------------------- */
 const parseRoute = () => {
   if (typeof window === 'undefined') return { page: 'home' };
+
+  if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+    return { page: 'admin' };
+  }
 
   const raw = window.location.hash.replace(/^#\/?/, '');
   const [path, search] = raw.split('?');
@@ -65,11 +70,10 @@ export default function App() {
   const [remoteProject, setRemoteProject] = useState(null);
 
   // Auth state
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return localStorage.getItem('lenso_admin_logged_in') === 'true';
-  });
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [adminAuthLoading, setAdminAuthLoading] = useState(
+    () => parseRoute().page === 'admin' && isSupabaseConfigured,
+  );
 
   const [activeSection, setActiveSection] = useState('home');
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -129,8 +133,35 @@ export default function App() {
 
   useEffect(() => {
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
   }, [handleHashChange]);
+
+  useEffect(() => {
+    if (route.page !== 'admin') return undefined;
+    if (!isSupabaseConfigured || !supabase) return undefined;
+
+    let mounted = true;
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (mounted) setIsAdminLoggedIn(Boolean(data.session?.user));
+      })
+      .catch((error) => {
+        console.error('Error verifying admin session:', error);
+        if (mounted) setIsAdminLoggedIn(false);
+      })
+      .finally(() => {
+        if (mounted) setAdminAuthLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [route.page]);
 
   /* Entering the archive always starts at the top of the page */
   useEffect(() => {
@@ -181,19 +212,27 @@ export default function App() {
     window.location.hash = `#/works${params.toString() ? `?${params.toString()}` : ''}`;
   }, []);
 
-  const handleAdminClick = () => {
-    if (isAdminLoggedIn) {
-      setShowAdminDashboard(true);
+  const handleLogout = () => {
+    if (supabase) {
+      supabase.auth.signOut().then(({ error }) => {
+        if (error) {
+          console.error('Error signing out admin:', error);
+          return;
+        }
+        setIsAdminLoggedIn(false);
+      });
     } else {
-      setShowLoginModal(true);
+      setIsAdminLoggedIn(false);
     }
+    localStorage.removeItem('lenso_admin_logged_in');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('lenso_admin_logged_in');
-    setIsAdminLoggedIn(false);
-    setShowAdminDashboard(false);
-  };
+  const leaveAdmin = useCallback(() => {
+    window.history.pushState(null, '', '/');
+    const next = parseRoute();
+    setRoute(next);
+    setBackgroundRoute(next);
+  }, []);
 
   const handleBookingSubmit = (e) => {
     e.preventDefault();
@@ -204,18 +243,40 @@ export default function App() {
     }, 2500);
   };
 
+  if (route.page === 'admin') {
+    return (
+      <div className={`lenso-app-wrapper lang-${lang}`}>
+        {adminAuthLoading ? (
+          <div className="admin-auth-loading" role="status">{t('checking_admin_session')}</div>
+        ) : isAdminLoggedIn ? (
+          <AdminDashboard
+            onClose={leaveAdmin}
+            onDataChanged={loadData}
+            onLogout={handleLogout}
+            t={t}
+            lang={lang}
+          />
+        ) : (
+          <AdminLoginModal
+            isOpen
+            onClose={leaveAdmin}
+            onLoginSuccess={() => setIsAdminLoggedIn(true)}
+            t={t}
+            lang={lang}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`lenso-app-wrapper lang-${lang}`}>
       {/* 1. Pinned Main Navigation Header */}
       <Navbar
         activeSection={route.page === 'works' ? 'portfolio' : activeSection}
         onNavigate={(sec) => setActiveSection(sec)}
-        onOpenAdmin={handleAdminClick}
         onBookSession={() => setShowBookingModal(true)}
         onSearch={handleSearch}
-        categories={categories}
-        isAdmin={isAdminLoggedIn}
-        onLogout={handleLogout}
         t={t}
         lang={lang}
         onToggleLang={toggleLanguage}
@@ -231,7 +292,6 @@ export default function App() {
           loading={loading}
           initialCategoryId={backgroundRoute.categoryId || 'all'}
           initialQuery={backgroundRoute.query || ''}
-          onBookSession={() => setShowBookingModal(true)}
           t={t}
         />
       ) : (
@@ -239,10 +299,7 @@ export default function App() {
           {/* 2. Hero Section */}
           <Hero t={t} />
 
-          {/* 3. Features Bar (4 Pillars) */}
-          <FeaturesBar t={t} />
-
-          {/* 4. Photography Portfolio (2x3 Grid with Categories) */}
+          {/* 3. Photography Portfolio (2x3 Grid with Categories) */}
           <PortfolioSection
             categories={categories}
             projects={projects}
@@ -250,19 +307,16 @@ export default function App() {
             t={t}
           />
 
-          {/* 5. About Section (Overlapping Photos, Story, Stats) */}
+          {/* 4. About Section (Overlapping Photos, Story, Stats) */}
           <AboutSection t={t} />
 
-          {/* 6. Studio Equipment Section */}
+          {/* 5. Studio Equipment Section */}
           <EquipmentSection equipment={equipment} t={t} />
-
-          {/* 7. Testimonials Section (What Our Clients Say) */}
-          <TestimonialsSection t={t} lang={lang} />
         </main>
       )}
 
-      {/* 8. Footer (5 Columns & Legal) */}
-      <Footer onOpenAdmin={handleAdminClick} t={t} lang={lang} />
+      {/* 6. Footer (4 Columns & Legal) */}
+      <Footer t={t} />
 
       {/* Professional full-screen project gallery (#/project/<id>) */}
       {route.page === 'project' && activeProject && (
@@ -270,28 +324,6 @@ export default function App() {
           key={activeProject.id}
           project={activeProject}
           onClose={closeProjectGallery}
-          t={t}
-          lang={lang}
-        />
-      )}
-
-      {/* Admin Login Modal */}
-      <AdminLoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={() => {
-          setIsAdminLoggedIn(true);
-          setShowAdminDashboard(true);
-        }}
-        t={t}
-      />
-
-      {/* Admin Dashboard */}
-      {showAdminDashboard && (
-        <AdminDashboard
-          onClose={() => setShowAdminDashboard(false)}
-          onDataChanged={loadData}
-          onLogout={handleLogout}
           t={t}
           lang={lang}
         />

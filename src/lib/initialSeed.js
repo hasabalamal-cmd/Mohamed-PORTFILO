@@ -1,4 +1,4 @@
-// Default seed data matching the Lenso Photography design exactly
+// Default seed data matching the MFM Photography design
 export const INITIAL_CATEGORIES = [
   { id: 'cat-1', name: 'Weddings', created_at: new Date('2024-01-01').toISOString() },
   { id: 'cat-2', name: 'Portraits', created_at: new Date('2024-01-02').toISOString() },

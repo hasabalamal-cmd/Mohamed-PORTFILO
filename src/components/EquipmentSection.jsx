@@ -8,11 +8,8 @@ export default function EquipmentSection({ equipment = [], t }) {
     <section id="equipment" className="lenso-equipment-section">
       <div className="container">
         <div className="equipment-header text-center">
-          <span className="section-subtitle">{t('studio_arsenal')}</span>
+
           <h2 className="section-title text-white">{t('high_end_equipment')}</h2>
-          <p className="equipment-header-subtitle">
-            {t('equipment_desc')}
-          </p>
         </div>
 
         <div className="equipment-cards-grid">

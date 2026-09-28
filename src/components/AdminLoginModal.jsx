@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Lock, Mail, Key, ShieldCheck, X, AlertCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
-export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, t }) {
+export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, t, lang }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,50 +16,30 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, t }) 
     setErrorMsg('');
 
     try {
-      // 1. If Supabase configured, attempt real auth
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data?.user) {
-          localStorage.setItem('lenso_admin_logged_in', 'true');
-          onLoginSuccess(data.user);
-          onClose();
-          return;
-        }
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error(t('auth_not_configured'));
       }
 
-      // 2. Demo fallback authentication for easy preview & testing
-      if (
-        (email.trim() === 'admin@mfmvcs.com' && password === 'admin123') ||
-        (email.trim() === 'admin' && password === 'admin')
-      ) {
-        localStorage.setItem('lenso_admin_logged_in', 'true');
-        onLoginSuccess({ email: email.trim(), role: 'admin' });
-        onClose();
-      } else {
-        throw new Error(t('invalid_credentials') + ' (جرّب: admin@mfmvcs.com / admin123)');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
+
+      if (!data.user) {
+        throw new Error(t('invalid_credentials'));
+      }
+
+      onLoginSuccess(data.user);
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message || t('invalid_credentials'));
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickDemo = () => {
-    setEmail('admin@mfmvcs.com');
-    setPassword('admin123');
-    localStorage.setItem('lenso_admin_logged_in', 'true');
-    onLoginSuccess({ email: 'admin@mfmvcs.com', role: 'admin' });
-    onClose();
   };
 
   return (
@@ -91,9 +71,9 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, t }) 
               <div className="login-input-wrapper">
                 <Mail size={16} className="login-field-icon" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder="admin@mfmvcs.com"
+                  placeholder={lang === 'ar' ? 'أدخل البريد الإلكتروني' : 'Enter your email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="admin-input with-icon"
@@ -122,19 +102,6 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess, t }) 
             </button>
           </form>
 
-          <div className="login-demo-helper">
-            <div className="demo-credentials-box">
-              <span>بيانات الدخول الافتراضية (Demo):</span>
-              <code>admin@mfmvcs.com</code> / <code>admin123</code>
-            </div>
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="btn-demo-quick"
-            >
-              ⚡ {t('quick_demo_login')}
-            </button>
-          </div>
         </div>
       </div>
     </div>

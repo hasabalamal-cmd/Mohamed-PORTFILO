@@ -44,7 +44,7 @@ export default function Hero({ t }) {
 
           {/* Actions */}
           <div className="hero-cta-group">
-            <a href="#portfolio" className="btn-gold hero-btn-primary">
+            <a href="#/works" className="btn-gold hero-btn-primary">
               {t('view_portfolio')} <ArrowRight size={16} className="flip-on-rtl" />
             </a>
           </div>
