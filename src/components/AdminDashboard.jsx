@@ -37,14 +37,24 @@ import {
   uploadImageToGoogleDrive,
   isSupabaseConfigured,
 } from '../lib/supabaseClient';
-import { normalizeImageUrl } from '../lib/imageUrl';
+import {
+  getGoogleDriveImagePreviewFallback,
+  normalizeGoogleDriveImageUrl,
+} from '../lib/imageUrl';
 
 const getImagePreviewUrl = (value) => {
   if (!value?.trim()) return '';
   try {
-    return normalizeImageUrl(value);
+    return normalizeGoogleDriveImageUrl(value);
   } catch {
     return '';
+  }
+};
+
+const handleImagePreviewError = (event) => {
+  const fallbackUrl = getGoogleDriveImagePreviewFallback(event.currentTarget.src);
+  if (fallbackUrl && event.currentTarget.src !== fallbackUrl) {
+    event.currentTarget.src = fallbackUrl;
   }
 };
 
@@ -178,7 +188,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     let coverImage;
     try {
       coverImage = projectForm.cover_image.trim()
-        ? normalizeImageUrl(projectForm.cover_image)
+        ? normalizeGoogleDriveImageUrl(projectForm.cover_image)
         : '';
     } catch (err) {
       showNotice('error', err.message || (lang === 'ar' ? 'رابط صورة الغلاف غير صالح' : 'Invalid cover image URL'));
@@ -278,7 +288,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
 
     let imageUrl;
     try {
-      imageUrl = normalizeImageUrl(galleryImageUrl);
+      imageUrl = normalizeGoogleDriveImageUrl(galleryImageUrl);
     } catch (err) {
       showNotice('error', err.message || (lang === 'ar' ? 'رابط الصورة غير صالح' : 'Invalid image URL'));
       return;
@@ -730,7 +740,11 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                 </div>
                 {getImagePreviewUrl(galleryImageUrl) && (
                   <div className="preview-box">
-                    <img src={getImagePreviewUrl(galleryImageUrl)} alt={lang === 'ar' ? 'معاينة الصورة' : 'Image preview'} />
+                    <img
+                      src={getImagePreviewUrl(galleryImageUrl)}
+                      alt={lang === 'ar' ? 'معاينة الصورة' : 'Image preview'}
+                      onError={handleImagePreviewError}
+                    />
                   </div>
                 )}
                 {galleryImageUrl.trim() && !getImagePreviewUrl(galleryImageUrl) && (
@@ -745,7 +759,11 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                 {projectImages.map((img, index) => (
                   <div key={img.id} className="admin-image-card">
                     <div className="image-card-preview">
-                      <img src={img.image_url} alt={`Sort order ${img.sort_order}`} />
+                      <img
+                        src={img.image_url}
+                        alt={`Sort order ${img.sort_order}`}
+                        onError={handleImagePreviewError}
+                      />
                       <span className="badge-sort-order">#{index + 1}</span>
                     </div>
 
@@ -1070,7 +1088,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) => {
-                              setProjectForm((prev) => ({ ...prev, cover_image: normalizeImageUrl(url) }));
+                              setProjectForm((prev) => ({ ...prev, cover_image: normalizeGoogleDriveImageUrl(url) }));
                               setCoverUploadFailed(false);
                             }, () => setCoverUploadFailed(true), () => {
                               setProjectForm((prev) => ({ ...prev, cover_image: '' }));
@@ -1085,7 +1103,11 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   </div>
                   {getImagePreviewUrl(projectForm.cover_image) && (
                     <div className="preview-box">
-                      <img src={getImagePreviewUrl(projectForm.cover_image)} alt="Cover Preview" />
+                      <img
+                        src={getImagePreviewUrl(projectForm.cover_image)}
+                        alt="Cover Preview"
+                        onError={handleImagePreviewError}
+                      />
                     </div>
                   )}
                   {projectForm.cover_image && !getImagePreviewUrl(projectForm.cover_image) && (
@@ -1227,7 +1249,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) =>
-                              setEquipmentForm((prev) => ({ ...prev, image_url: normalizeImageUrl(url) })),
+                              setEquipmentForm((prev) => ({ ...prev, image_url: normalizeGoogleDriveImageUrl(url) })),
                             () => setEquipmentUploadFailed(true),
                             () => {
                               setEquipmentForm((prev) => ({ ...prev, image_url: '' }));
@@ -1242,7 +1264,11 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   </div>
                   {getImagePreviewUrl(equipmentForm.image_url) && (
                     <div className="preview-box">
-                      <img src={getImagePreviewUrl(equipmentForm.image_url)} alt="Equipment Preview" />
+                      <img
+                        src={getImagePreviewUrl(equipmentForm.image_url)}
+                        alt="Equipment Preview"
+                        onError={handleImagePreviewError}
+                      />
                     </div>
                   )}
                   {equipmentForm.image_url && !getImagePreviewUrl(equipmentForm.image_url) && (

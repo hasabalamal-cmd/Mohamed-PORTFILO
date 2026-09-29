@@ -5,7 +5,7 @@ import {
   INITIAL_PROJECT_IMAGES,
   INITIAL_EQUIPMENT,
 } from './initialSeed';
-import { normalizeImageUrl } from './imageUrl';
+import { normalizeGoogleDriveImageUrl } from './imageUrl';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabasePublishableKey =
@@ -207,7 +207,7 @@ export async function getProjectById(id) {
 export async function createProject({ name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
-  const normalizedCoverImage = cover_image ? normalizeImageUrl(cover_image) : null;
+  const normalizedCoverImage = cover_image ? normalizeGoogleDriveImageUrl(cover_image) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -245,7 +245,7 @@ export async function createProject({ name, category_id, cover_image }) {
 export async function updateProject(id, { name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
-  const normalizedCoverImage = cover_image ? normalizeImageUrl(cover_image) : null;
+  const normalizedCoverImage = cover_image ? normalizeGoogleDriveImageUrl(cover_image) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -338,7 +338,7 @@ export async function getAllProjectImages() {
 
 export async function addProjectImage({ project_id, image_url, sort_order = 0 }) {
   if (!project_id || !image_url) throw new Error('بيانات الصورة غير مكتملة');
-  const normalizedImageUrl = normalizeImageUrl(image_url);
+  const normalizedImageUrl = normalizeGoogleDriveImageUrl(image_url);
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -416,7 +416,7 @@ export async function getEquipment() {
 
 export async function createEquipment({ name, model, image_url }) {
   if (!name || !name.trim()) throw new Error('اسم المعدة مطلوب');
-  const normalizedImageUrl = image_url ? normalizeImageUrl(image_url) : null;
+  const normalizedImageUrl = image_url ? normalizeGoogleDriveImageUrl(image_url) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -443,7 +443,7 @@ export async function createEquipment({ name, model, image_url }) {
 
 export async function updateEquipment(id, { name, model, image_url }) {
   if (!name || !name.trim()) throw new Error('اسم المعدة مطلوب');
-  const normalizedImageUrl = image_url ? normalizeImageUrl(image_url) : null;
+  const normalizedImageUrl = image_url ? normalizeGoogleDriveImageUrl(image_url) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
