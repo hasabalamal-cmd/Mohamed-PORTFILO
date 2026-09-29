@@ -206,6 +206,7 @@ export async function getProjectById(id) {
 export async function createProject({ name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
+  assertRemoteProjectCover(cover_image);
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -243,6 +244,7 @@ export async function createProject({ name, category_id, cover_image }) {
 export async function updateProject(id, { name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
+  assertRemoteProjectCover(cover_image);
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -277,6 +279,21 @@ export async function updateProject(id, { name, category_id, cover_image }) {
 
   setLocal(STORAGE_KEYS.PROJECTS, updated);
   return updated.find((p) => p.id === id);
+}
+
+function assertRemoteProjectCover(coverImage) {
+  if (!coverImage) return;
+
+  let url;
+  try {
+    url = new URL(coverImage);
+  } catch {
+    throw new Error('رابط صورة الغلاف غير صالح');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('يجب أن يكون رابط صورة الغلاف رابطاً عاماً، ولا يمكن حفظ Base64');
+  }
 }
 
 export async function deleteProject(id) {
@@ -479,19 +496,25 @@ export async function deleteEquipment(id) {
 export async function uploadImageToGoogleDrive(file, folderId = null) {
   if (!file) throw new Error('لم يتم تحديد أي ملف');
 
-  // Convert File to Base64
   const base64Data = await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (err) => reject(err);
+    reader.onload = () => {
+      if (typeof reader.result !== 'string' || !reader.result.startsWith('data:')) {
+        reject(new Error('تعذرت قراءة الصورة المحددة'));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(new Error('تعذرت قراءة الصورة المحددة'));
     reader.readAsDataURL(file);
   });
 
   const uploadEndpoint =
     import.meta.env.VITE_UPLOAD_API_URL || '/.netlify/functions/upload-to-drive';
 
+  let response;
   try {
-    const response = await fetch(uploadEndpoint, {
+    response = await fetch(uploadEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -503,39 +526,57 @@ export async function uploadImageToGoogleDrive(file, folderId = null) {
         folderId,
       }),
     });
+  } catch (error) {
+    console.error('Google Drive upload request failed:', error);
+    throw new Error(`تعذر الاتصال بخدمة رفع Google Drive: ${error.message}`);
+  }
 
-    if (response.ok) {
-  const result = await response.json();
-
-  if (!result.success || !result.imageUrl) {
+  const responseText = await response.text();
+  let result;
+  try {
+    result = JSON.parse(responseText);
+  } catch {
     throw new Error(
-      result.error || 'لم يتم الحصول على رابط الصورة من Google Drive'
+      `استجابة خدمة رفع Google Drive غير صالحة (${response.status})`,
     );
+  }
+
+  if (!response.ok) {
+    console.error('Netlify function upload failed:', result);
+    throw new Error(
+      result?.error || `فشل رفع الصورة إلى Google Drive (${response.status})`,
+    );
+  }
+
+  if (
+    result?.success !== true ||
+    typeof result.imageUrl !== 'string' ||
+    typeof result.fileId !== 'string' ||
+    !result.fileId
+  ) {
+    throw new Error(
+      result?.error || 'لم تُرجع خدمة Google Drive رابطاً صالحاً للصورة',
+    );
+  }
+
+  let imageUrl;
+  try {
+    imageUrl = new URL(result.imageUrl);
+  } catch {
+    throw new Error('أعادت خدمة Google Drive رابط صورة غير صالح');
+  }
+
+  if (
+    imageUrl.protocol !== 'https:' ||
+    !['lh3.googleusercontent.com', 'drive.google.com'].includes(imageUrl.hostname)
+  ) {
+    throw new Error('أعادت خدمة Google Drive رابطاً لا يشير إلى Google Drive');
   }
 
   return {
     success: true,
-    imageUrl: result.imageUrl,
+    imageUrl: imageUrl.href,
     fileId: result.fileId,
     source: 'google_drive',
   };
-} else {
-  const errData = await response.json().catch(() => ({}));
-
-  console.error('Netlify function upload failed:', errData);
-
-  throw new Error(
-    errData?.error ||
-      `فشل رفع الصورة إلى Google Drive (${response.status})`
-  );
-}
-  } catch (err) {
-    console.warn('Network call to Netlify function failed (normal in offline/local Vite dev):', err);
-    return {
-      success: true,
-      imageUrl: base64Data,
-      source: 'local_preview',
-      notice: 'تم استخدام المعاينة المحلية. عند النشر على Netlify مع بيانات Google Drive سيتم الرفع إلى Google Drive.',
-    };
-  }
 }

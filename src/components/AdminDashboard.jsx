@@ -142,6 +142,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
 
   const handleSaveProject = async (e) => {
     e.preventDefault();
+    if (uploadingImage) {
+      showNotice('error', lang === 'ar' ? 'يرجى الانتظار حتى اكتمال رفع صورة الغلاف' : 'Wait for the cover image upload to finish');
+      return;
+    }
     if (!projectForm.name.trim()) {
       showNotice('error', lang === 'ar' ? 'يرجى إدخال اسم المشروع' : 'Project name is required');
       return;
@@ -353,10 +357,14 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     setUploadingImage(true);
     try {
       const res = await uploadImageToGoogleDrive(file);
+      if (res.success !== true || res.source !== 'google_drive' || !res.imageUrl) {
+        throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Drive' : 'Google Drive did not return an image URL');
+      }
       onUploaded(res.imageUrl);
       showNotice('success', lang === 'ar' ? 'تم رفع الصورة عبر الوسيط Google Drive' : 'Uploaded image via Google Drive proxy');
     } catch (err) {
-      showNotice('error', err.message || (lang === 'ar' ? 'فشل رفع الصورة' : 'Failed to upload'));
+      console.error('Cover image upload failed:', err);
+      showNotice('error', err.message || (lang === 'ar' ? 'فشل رفع الصورة إلى Google Drive' : 'Failed to upload image to Google Drive'));
     } finally {
       setUploadingImage(false);
     }
@@ -957,7 +965,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   >
                     {t('cancel')}
                   </button>
-                  <button type="submit" disabled={loading} className="btn-gold">
+                  <button type="submit" disabled={loading || uploadingImage} className="btn-gold">
                     {loading ? t('uploading') : t('save')}
                   </button>
                 </div>
