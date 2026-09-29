@@ -17,7 +17,11 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes('your-project-ref') &&
   !supabasePublishableKey.includes('your_publishable_key')
 );
-
+console.log('[Supabase Config]', {
+  url: supabaseUrl,
+  hasKey: Boolean(supabasePublishableKey),
+  isConfigured: isSupabaseConfigured,
+});
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabasePublishableKey)
   : null;
