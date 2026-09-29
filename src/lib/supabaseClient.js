@@ -496,35 +496,17 @@ export async function deleteEquipment(id) {
 export async function uploadImageToGoogleDrive(file, folderId = null) {
   if (!file) throw new Error('لم يتم تحديد أي ملف');
 
-  const base64Data = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string' || !reader.result.startsWith('data:')) {
-        reject(new Error('تعذرت قراءة الصورة المحددة'));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.onerror = () => reject(new Error('تعذرت قراءة الصورة المحددة'));
-    reader.readAsDataURL(file);
-  });
-
   const uploadEndpoint =
     import.meta.env.VITE_UPLOAD_API_URL || '/.netlify/functions/upload-to-drive';
+  const formData = new FormData();
+  formData.append('file', file, file.name);
+  if (folderId) formData.append('folderId', folderId);
 
   let response;
   try {
     response = await fetch(uploadEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fileName: file.name,
-        mimeType: file.type,
-        base64Data,
-        folderId,
-      }),
+      body: formData,
     });
   } catch (error) {
     console.error('Google Drive upload request failed:', error);

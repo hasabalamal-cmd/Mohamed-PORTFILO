@@ -9,6 +9,85 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const badRequest = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
+
+export function parseMultipartFormData(body, contentType, isBase64Encoded = false) {
+  const boundaryMatch = contentType?.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  const boundary = boundaryMatch?.[1] || boundaryMatch?.[2]?.trim();
+  if (!boundary || boundary.length > 200) {
+    throw badRequest("Missing or invalid multipart boundary.");
+  }
+
+  const requestBuffer = Buffer.isBuffer(body)
+    ? body
+    : Buffer.from(body || "", isBase64Encoded ? "base64" : "utf8");
+  const delimiter = Buffer.from(`--${boundary}`);
+  const separator = Buffer.from(`\r\n--${boundary}`);
+  const fields = {};
+  let file = null;
+  let cursor = 0;
+
+  if (!requestBuffer.subarray(0, delimiter.length).equals(delimiter)) {
+    throw badRequest("Malformed multipart request.");
+  }
+
+  while (cursor < requestBuffer.length) {
+    if (!requestBuffer.subarray(cursor, cursor + delimiter.length).equals(delimiter)) {
+      throw badRequest("Malformed multipart boundary.");
+    }
+    cursor += delimiter.length;
+
+    if (requestBuffer.subarray(cursor, cursor + 2).toString() === "--") break;
+    if (requestBuffer.subarray(cursor, cursor + 2).toString() !== "\r\n") {
+      throw badRequest("Malformed multipart part.");
+    }
+    cursor += 2;
+
+    const headersEnd = requestBuffer.indexOf(Buffer.from("\r\n\r\n"), cursor);
+    if (headersEnd === -1) throw badRequest("Missing multipart part headers.");
+
+    const headers = requestBuffer.subarray(cursor, headersEnd).toString("latin1");
+    const disposition = headers.match(/^content-disposition:\s*form-data;(.*)$/im)?.[1];
+    const fieldName = disposition?.match(/(?:^|;)\s*name="([^"]*)"/i)?.[1];
+    const filename = disposition?.match(/(?:^|;)\s*filename="([^"]*)"/i)?.[1];
+    if (!fieldName) throw badRequest("Multipart part is missing its field name.");
+
+    const contentTypeHeader = headers.match(/^content-type:\s*([^\r\n]+)/im)?.[1]?.trim();
+    const valueStart = headersEnd + 4;
+    const nextPartStart = requestBuffer.indexOf(separator, valueStart);
+    if (nextPartStart === -1) throw badRequest("Multipart part has no closing boundary.");
+
+    const value = requestBuffer.subarray(valueStart, nextPartStart);
+    if (filename !== undefined) {
+      if (fieldName !== "file" || file) {
+        throw badRequest("Exactly one file field named 'file' is supported.");
+      }
+      file = {
+        fileName: filename,
+        mimeType: contentTypeHeader || "application/octet-stream",
+        buffer: value,
+      };
+    } else {
+      fields[fieldName] = value.toString("utf8");
+    }
+
+    cursor = nextPartStart + 2;
+  }
+
+  if (!file?.fileName || file.buffer.length === 0) {
+    throw badRequest("A non-empty file field named 'file' is required.");
+  }
+  if (!file.mimeType.startsWith("image/")) {
+    throw badRequest("The uploaded file must be an image.");
+  }
+
+  return { ...file, folderId: fields.folderId || null };
+}
+
 export const handler = async (event) => {
   // =========================
   // CORS
@@ -42,78 +121,16 @@ export const handler = async (event) => {
   }
 
   try {
-    // =========================
-    // Read request
-    // =========================
-
-    let payload = {};
-
-    try {
-      payload = JSON.parse(event.body || "{}");
-    } catch {
-      return {
-        statusCode: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          success: false,
-          error: "Invalid JSON request body.",
-        }),
-      };
+    const contentType = event.headers?.["content-type"] || event.headers?.["Content-Type"];
+    if (!contentType?.toLowerCase().startsWith("multipart/form-data")) {
+      throw badRequest("Content-Type must be multipart/form-data.");
     }
 
-    const {
-      fileName,
-      mimeType,
-      base64Data,
-      folderId,
-    } = payload;
-
-    // =========================
-    // Validate request
-    // =========================
-
-    if (!base64Data || !fileName) {
-      return {
-        statusCode: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          success: false,
-          error:
-            "Missing required fields: fileName or base64Data",
-        }),
-      };
-    }
-
-    // =========================
-    // Clean Base64
-    // =========================
-
-    const cleanBase64 = String(base64Data)
-      .replace(/^data:[^;]+;base64,/i, "")
-      .replace(/\s/g, "");
-
-    const buffer = Buffer.from(cleanBase64, "base64");
-
-    if (!buffer.length) {
-      return {
-        statusCode: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          success: false,
-          error: "Invalid or empty base64 image data.",
-        }),
-      };
-    }
-
+    const { fileName, mimeType, buffer, folderId } = parseMultipartFormData(
+      event.body,
+      contentType,
+      event.isBase64Encoded,
+    );
     const bufferStream = Readable.from(buffer);
 
     // =========================
@@ -486,7 +503,7 @@ export const handler = async (event) => {
     );
 
     return {
-      statusCode: 500,
+      statusCode: error?.statusCode || 500,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",

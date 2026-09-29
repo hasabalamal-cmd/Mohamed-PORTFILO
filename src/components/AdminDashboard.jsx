@@ -52,6 +52,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [projectImages, setProjectImages] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [coverUploadFailed, setCoverUploadFailed] = useState(false);
 
   // Forms states
   const [projectForm, setProjectForm] = useState({
@@ -121,6 +122,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
   // PROJECTS HANDLERS
   // --------------------------------------------------------------------------
   const handleOpenNewProject = () => {
+    setCoverUploadFailed(false);
     setProjectForm({
       id: null,
       name: '',
@@ -131,6 +133,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
   };
 
   const handleEditProject = (proj) => {
+    setCoverUploadFailed(false);
     setProjectForm({
       id: proj.id,
       name: proj.name,
@@ -144,6 +147,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     e.preventDefault();
     if (uploadingImage) {
       showNotice('error', lang === 'ar' ? 'يرجى الانتظار حتى اكتمال رفع صورة الغلاف' : 'Wait for the cover image upload to finish');
+      return;
+    }
+    if (coverUploadFailed) {
+      showNotice('error', lang === 'ar' ? 'فشل رفع صورة الغلاف. أعد رفعها أو أدخل رابطاً صالحاً قبل الحفظ' : 'Cover upload failed. Retry the upload or enter a valid URL before saving');
       return;
     }
     if (!projectForm.name.trim()) {
@@ -353,7 +360,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     }
   };
 
-  const handleSingleUpload = async (file, onUploaded) => {
+  const handleSingleUpload = async (file, onUploaded, onUploadError = () => {}) => {
     setUploadingImage(true);
     try {
       const res = await uploadImageToGoogleDrive(file);
@@ -364,6 +371,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
       showNotice('success', lang === 'ar' ? 'تم رفع الصورة عبر الوسيط Google Drive' : 'Uploaded image via Google Drive proxy');
     } catch (err) {
       console.error('Cover image upload failed:', err);
+      onUploadError();
       showNotice('error', err.message || (lang === 'ar' ? 'فشل رفع الصورة إلى Google Drive' : 'Failed to upload image to Google Drive'));
     } finally {
       setUploadingImage(false);
@@ -927,9 +935,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                       type="url"
                       placeholder="https://..."
                       value={projectForm.cover_image}
-                      onChange={(e) =>
-                        setProjectForm({ ...projectForm, cover_image: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setProjectForm((prev) => ({ ...prev, cover_image: e.target.value }));
+                        setCoverUploadFailed(false);
+                      }}
                       className="admin-input"
                     />
                     <label className="btn-upload-file">
@@ -941,9 +950,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         disabled={uploadingImage}
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
-                            handleSingleUpload(e.target.files[0], (url) =>
-                              setProjectForm((prev) => ({ ...prev, cover_image: url }))
-                            );
+                            handleSingleUpload(e.target.files[0], (url) => {
+                              setProjectForm((prev) => ({ ...prev, cover_image: url }));
+                              setCoverUploadFailed(false);
+                            }, () => setCoverUploadFailed(true));
                           }
                         }}
                         style={{ display: 'none' }}
