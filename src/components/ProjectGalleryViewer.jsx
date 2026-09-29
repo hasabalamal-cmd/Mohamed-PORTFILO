@@ -30,7 +30,6 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
   const [gridOpen, setGridOpen] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [origin, setOrigin] = useState('center center');
   const [dragging, setDragging] = useState(false);
   const [toast, setToast] = useState('');
   const [hintVisible, setHintVisible] = useState(true);
@@ -111,7 +110,6 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
   const resetZoom = useCallback(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
-    setOrigin('center center');
   }, []);
 
   /* Preload the neighbouring photos for instant swiping */
@@ -153,18 +151,23 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
     const stage = stageRef.current;
     const value = Math.min(MAX_SCALE, Math.max(1, nextScale));
 
-    if (value > 1 && stage) {
-      const rect = stage.getBoundingClientRect();
-      const px = clientX == null ? 50 : ((clientX - rect.left) / rect.width) * 100;
-      const py = clientY == null ? 50 : ((clientY - rect.top) / rect.height) * 100;
-      setOrigin(`${Math.min(100, Math.max(0, px))}% ${Math.min(100, Math.max(0, py))}%`);
-    } else if (value <= 1) {
-      setOrigin('center center');
+    if (value <= 1) {
       setOffset({ x: 0, y: 0 });
+    } else if (stage && clientX != null && clientY != null) {
+      const rect = stage.getBoundingClientRect();
+      const ratio = value / scale;
+      const pointerX = clientX - rect.left - rect.width / 2;
+      const pointerY = clientY - rect.top - rect.height / 2;
+      const maxX = (rect.width * (value - 1)) / 2;
+      const maxY = (rect.height * (value - 1)) / 2;
+      setOffset({
+        x: clamp(pointerX - (pointerX - offset.x) * ratio, maxX),
+        y: clamp(pointerY - (pointerY - offset.y) * ratio, maxY),
+      });
     }
 
     setScale(value);
-  }, []);
+  }, [offset, scale]);
 
   const zoomIn = useCallback(() => zoomTo(scale * ZOOM_STEP), [scale, zoomTo]);
   const zoomOut = useCallback(() => zoomTo(scale / ZOOM_STEP), [scale, zoomTo]);
@@ -459,7 +462,6 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
                   draggable="false"
                   style={{
                     transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-                    transformOrigin: origin,
                     transition: dragging ? 'none' : undefined,
                   }}
                 />

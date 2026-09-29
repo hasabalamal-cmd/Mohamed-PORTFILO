@@ -3474,8 +3474,6 @@
 
 .pgv-image.is-zoomed {
   cursor: grab;
-  max-width: none;
-  max-height: none;
 }
 
 .pgv-state {
@@ -3587,6 +3585,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 165, 94, 0.055), transparent 58%),
+    #0b0b0b;
 }
 
 .pgv-grid-head {
@@ -3594,66 +3595,119 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 18px;
-  font-size: 0.76rem;
+  padding: 16px clamp(16px, 3vw, 36px);
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #b0b0b0;
-  border-bottom: 1px solid #1e1e1e;
+  letter-spacing: 0.06em;
+  color: #e4e4e4;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .pgv-grid-count {
+  padding: 5px 11px;
+  border: 1px solid rgba(212, 165, 94, 0.28);
+  border-radius: 999px;
+  background: rgba(212, 165, 94, 0.08);
   color: var(--accent-gold);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
 }
 
 .pgv-grid {
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-  padding: 16px 18px 26px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  align-content: start;
+  gap: clamp(12px, 1.5vw, 20px);
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: clamp(18px, 2.5vw, 34px) clamp(16px, 3vw, 40px) 36px;
+  scrollbar-width: thin;
+  scrollbar-color: #39332a transparent;
 }
 
 .pgv-grid-item {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   padding: 0;
-  border: 1px solid #242424;
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
   overflow: hidden;
-  background: #131313;
+  background: #151515;
   cursor: pointer;
-  transition: var(--transition-smooth);
+  isolation: isolate;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.pgv-grid-item::after {
+  position: absolute;
+  inset: 35% 0 0;
+  content: '';
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.48));
+  opacity: 0.65;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
 
 .pgv-grid-item img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.45s ease;
+  transition: transform 0.55s cubic-bezier(0.2, 0.65, 0.3, 1);
 }
 
 .pgv-grid-item:hover img {
-  transform: scale(1.07);
+  transform: scale(1.045);
+}
+
+.pgv-grid-item:hover {
+  transform: translateY(-3px);
+  border-color: rgba(212, 165, 94, 0.6);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+}
+
+.pgv-grid-item:hover::after {
+  opacity: 1;
 }
 
 .pgv-grid-item.active {
   border-color: var(--accent-gold);
-  box-shadow: 0 0 0 1px var(--accent-gold);
+  box-shadow: 0 0 0 2px rgba(212, 165, 94, 0.72), 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.pgv-grid-item:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 3px;
 }
 
 .pgv-grid-index {
   position: absolute;
-  top: 6px;
-  inset-inline-start: 6px;
-  background: rgba(0, 0, 0, 0.7);
-  color: var(--accent-gold);
-  font-size: 0.68rem;
+  inset-inline-start: 10px;
+  bottom: 9px;
+  z-index: 1;
+  min-width: 25px;
+  height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.56);
+  color: #fff;
+  font-size: 0.67rem;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 2px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+
+.pgv-grid-item.active .pgv-grid-index {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold);
+  color: #111;
 }
 
 /* --- Thumbnail filmstrip --------------------------------------------- */
@@ -3952,9 +4006,13 @@
   }
 
   .pgv-grid {
-    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-    gap: 8px;
-    padding: 12px 12px 20px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr));
+    gap: 10px;
+    padding: 14px 12px 22px;
+  }
+
+  .pgv-grid-item {
+    border-radius: 7px;
   }
 
   .pgv-toast {
