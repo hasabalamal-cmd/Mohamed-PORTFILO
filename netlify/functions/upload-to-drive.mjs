@@ -3,6 +3,8 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
 
+const MAX_IMAGE_SIZE_BYTES = 4 * 1024 * 1024;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -83,6 +85,11 @@ export function parseMultipartFormData(body, contentType, isBase64Encoded = fals
   }
   if (!file.mimeType.startsWith("image/")) {
     throw badRequest("The uploaded file must be an image.");
+  }
+  if (file.buffer.length > MAX_IMAGE_SIZE_BYTES) {
+    const error = new Error("Image exceeds the 4 MiB upload limit.");
+    error.statusCode = 413;
+    throw error;
   }
 
   return { ...file, folderId: fields.folderId || null };

@@ -37,6 +37,16 @@ import {
   uploadImageToGoogleDrive,
   isSupabaseConfigured,
 } from '../lib/supabaseClient';
+import { normalizeImageUrl } from '../lib/imageUrl';
+
+const getImagePreviewUrl = (value) => {
+  if (!value?.trim()) return '';
+  try {
+    return normalizeImageUrl(value);
+  } catch {
+    return '';
+  }
+};
 
 export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, lang }) {
   const [activeTab, setActiveTab] = useState('projects');
@@ -53,6 +63,9 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
   const [projectImages, setProjectImages] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [coverUploadFailed, setCoverUploadFailed] = useState(false);
+  const [equipmentUploadFailed, setEquipmentUploadFailed] = useState(false);
+  const [galleryImageUrl, setGalleryImageUrl] = useState('');
+  const [addingGalleryUrl, setAddingGalleryUrl] = useState(false);
 
   // Forms states
   const [projectForm, setProjectForm] = useState({
@@ -162,16 +175,28 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
       return;
     }
 
+    let coverImage;
+    try {
+      coverImage = projectForm.cover_image.trim()
+        ? normalizeImageUrl(projectForm.cover_image)
+        : '';
+    } catch (err) {
+      showNotice('error', err.message || (lang === 'ar' ? 'رابط صورة الغلاف غير صالح' : 'Invalid cover image URL'));
+      return;
+    }
+
+    const projectToSave = { ...projectForm, cover_image: coverImage };
+    setProjectForm(projectToSave);
     setLoading(true);
     try {
       if (projectForm.id) {
-        await updateProject(projectForm.id, projectForm);
+        await updateProject(projectForm.id, projectToSave);
         showNotice('success', lang === 'ar' ? 'تم تحديث المشروع بنجاح' : 'Project updated successfully');
         setShowProjectModal(false);
         await loadAll();
         if (onDataChanged) onDataChanged();
       } else {
-        const created = await createProject(projectForm);
+        const created = await createProject(projectToSave);
         showNotice('success', lang === 'ar' ? 'تم إنشاء المشروع بنجاح! تم نقلك لإدارة صوره' : 'Project created! Redirected to manage photos');
         setShowProjectModal(false);
         await loadAll();
@@ -222,6 +247,9 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const res = await uploadImageToGoogleDrive(file);
+        if (res.success !== true || res.source !== 'google_drive' || !res.imageUrl) {
+          throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Drive' : 'Google Drive did not return an image URL');
+        }
         const nextOrder = projectImages.length + i;
         await addProjectImage({
           project_id: activeProjectId,
@@ -238,6 +266,41 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     } finally {
       setUploadingImage(false);
       e.target.value = '';
+    }
+  };
+
+  const handleAddGalleryImageUrl = async (e) => {
+    e.preventDefault();
+    if (!activeProjectId) {
+      showNotice('error', lang === 'ar' ? 'اختر مشروعاً أولاً' : 'Select a project first');
+      return;
+    }
+
+    let imageUrl;
+    try {
+      imageUrl = normalizeImageUrl(galleryImageUrl);
+    } catch (err) {
+      showNotice('error', err.message || (lang === 'ar' ? 'رابط الصورة غير صالح' : 'Invalid image URL'));
+      return;
+    }
+
+    setAddingGalleryUrl(true);
+    try {
+      await addProjectImage({
+        project_id: activeProjectId,
+        image_url: imageUrl,
+        sort_order: projectImages.length,
+      });
+      const updatedImages = await getProjectImages(activeProjectId);
+      setProjectImages(updatedImages || []);
+      setGalleryImageUrl('');
+      showNotice('success', lang === 'ar' ? 'تمت إضافة الصورة إلى المعرض' : 'Image added to gallery');
+      if (onDataChanged) onDataChanged();
+    } catch (err) {
+      console.error('Gallery image URL could not be saved:', err);
+      showNotice('error', err.message || (lang === 'ar' ? 'تعذرت إضافة رابط الصورة' : 'Could not add image URL'));
+    } finally {
+      setAddingGalleryUrl(false);
     }
   };
 
@@ -324,6 +387,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
   // --------------------------------------------------------------------------
   const handleSaveEquipment = async (e) => {
     e.preventDefault();
+    if (uploadingImage || equipmentUploadFailed) {
+      showNotice('error', lang === 'ar' ? 'أكمل رفع الصورة أو أعد إدخال رابط صالح قبل الحفظ' : 'Finish uploading or enter a valid image URL before saving');
+      return;
+    }
     if (!equipmentForm.name.trim()) {
       showNotice('error', lang === 'ar' ? 'يرجى إدخال اسم المعدة' : 'Equipment name is required');
       return;
@@ -360,7 +427,13 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     }
   };
 
-  const handleSingleUpload = async (file, onUploaded, onUploadError = () => {}) => {
+  const handleSingleUpload = async (
+    file,
+    onUploaded,
+    onUploadError = () => {},
+    onUploadStart = () => {},
+  ) => {
+    onUploadStart();
     setUploadingImage(true);
     try {
       const res = await uploadImageToGoogleDrive(file);
@@ -571,7 +644,10 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   <label>{t('active_project')}: </label>
                   <select
                     value={activeProjectId || ''}
-                    onChange={(e) => setActiveProjectId(e.target.value)}
+                    onChange={(e) => {
+                      setActiveProjectId(e.target.value);
+                      setGalleryImageUrl('');
+                    }}
                     className="admin-select"
                   >
                     {projects.map((p) => (
@@ -608,12 +684,12 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   multiple
                   accept="image/*"
                   onChange={handleUploadProjectImage}
-                  disabled={uploadingImage || !activeProjectId}
+                  disabled={uploadingImage || addingGalleryUrl || !activeProjectId}
                   style={{ display: 'none' }}
                 />
                 <label
                   htmlFor="multi-image-upload"
-                  className={`dropzone-label ${uploadingImage ? 'disabled' : ''}`}
+                  className={`dropzone-label ${uploadingImage || addingGalleryUrl ? 'disabled' : ''}`}
                 >
                   <Cloud size={38} className="text-gold" />
                   <span className="dropzone-title">
@@ -626,6 +702,43 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   </span>
                 </label>
               </div>
+
+              <form className="gallery-image-link-form" onSubmit={handleAddGalleryImageUrl}>
+                <label htmlFor="gallery-image-url" className="form-label">
+                  {lang === 'ar' ? 'إضافة صورة عبر رابط' : 'Add image using a URL'}
+                </label>
+                <div className="gallery-image-link-row">
+                  <input
+                    id="gallery-image-url"
+                    type="text"
+                    placeholder="https://... أو رابط Google Drive"
+                    value={galleryImageUrl}
+                    onChange={(e) => setGalleryImageUrl(e.target.value)}
+                    className="admin-input"
+                    disabled={!activeProjectId || addingGalleryUrl || uploadingImage}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-gold"
+                    disabled={!activeProjectId || addingGalleryUrl || uploadingImage || !galleryImageUrl.trim()}
+                  >
+                    <Plus size={16} />
+                    <span>{addingGalleryUrl
+                      ? (lang === 'ar' ? 'جارٍ الإضافة...' : 'Adding...')
+                      : (lang === 'ar' ? 'إضافة الرابط' : 'Add URL')}</span>
+                  </button>
+                </div>
+                {getImagePreviewUrl(galleryImageUrl) && (
+                  <div className="preview-box">
+                    <img src={getImagePreviewUrl(galleryImageUrl)} alt={lang === 'ar' ? 'معاينة الصورة' : 'Image preview'} />
+                  </div>
+                )}
+                {galleryImageUrl.trim() && !getImagePreviewUrl(galleryImageUrl) && (
+                  <p className="image-url-error">
+                    {lang === 'ar' ? 'الرابط غير صالح. استخدم رابط HTTP(S) مباشر أو رابط Google Drive.' : 'Invalid URL. Use a direct HTTP(S) image link or a Google Drive link.'}
+                  </p>
+                )}
+              </form>
 
               {/* Images Grid with Sort Order Controls */}
               <div className="project-images-grid">
@@ -763,6 +876,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                 </div>
                 <button
                   onClick={() => {
+                    setEquipmentUploadFailed(false);
                     setEquipmentForm({ id: null, name: '', model: '', image_url: '' });
                     setShowEquipmentModal(true);
                   }}
@@ -799,6 +913,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                           <div className="table-actions-cell">
                             <button
                               onClick={() => {
+                                setEquipmentUploadFailed(false);
                                 setEquipmentForm({
                                   id: eq.id,
                                   name: eq.name,
@@ -867,12 +982,12 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   </div>
                   <div className="status-indicator-row">
                     <span className="status-dot dot-green" />
-                    <span>netlify/functions/upload-to-drive.js</span>
+                    <span>netlify/functions/upload-to-drive.mjs</span>
                   </div>
                   <p className="status-desc">
                     {lang === 'ar' 
-                      ? 'الـ Frontend يرسل الصور المشفرة بصيغة Base64 إلى Netlify Function التي تستخدم صلاحيات Service Account لرفعها إلى مجلد Google Drive وحفظ الرابط في Supabase.'
-                      : 'Frontend sends Base64 images to serverless Netlify function, which uploads securely to Google Drive API.'}
+                      ? 'يرسل Frontend ملفات الصور مباشرة بصيغة multipart/form-data إلى Netlify Function، ثم تُرفع إلى Google Drive ويُحفظ رابط الصورة في Supabase.'
+                      : 'Frontend sends image files directly as multipart/form-data to the Netlify Function, which uploads them to Google Drive and saves their URLs in Supabase.'}
                   </p>
                 </div>
               </div>
@@ -932,12 +1047,16 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   <label>{t('cover_image')} (Google Drive / Direct URL)</label>
                   <div className="cover-upload-flex">
                     <input
-                      type="url"
+                      type="text"
                       placeholder="https://..."
                       value={projectForm.cover_image}
                       onChange={(e) => {
                         setProjectForm((prev) => ({ ...prev, cover_image: e.target.value }));
                         setCoverUploadFailed(false);
+                      }}
+                      onBlur={(e) => {
+                        const previewUrl = getImagePreviewUrl(e.target.value);
+                        if (previewUrl) setProjectForm((prev) => ({ ...prev, cover_image: previewUrl }));
                       }}
                       className="admin-input"
                     />
@@ -951,19 +1070,28 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) => {
-                              setProjectForm((prev) => ({ ...prev, cover_image: url }));
+                              setProjectForm((prev) => ({ ...prev, cover_image: normalizeImageUrl(url) }));
                               setCoverUploadFailed(false);
-                            }, () => setCoverUploadFailed(true));
+                            }, () => setCoverUploadFailed(true), () => {
+                              setProjectForm((prev) => ({ ...prev, cover_image: '' }));
+                              setCoverUploadFailed(false);
+                            });
                           }
+                          e.target.value = '';
                         }}
                         style={{ display: 'none' }}
                       />
                     </label>
                   </div>
-                  {projectForm.cover_image && (
+                  {getImagePreviewUrl(projectForm.cover_image) && (
                     <div className="preview-box">
-                      <img src={projectForm.cover_image} alt="Cover Preview" />
+                      <img src={getImagePreviewUrl(projectForm.cover_image)} alt="Cover Preview" />
                     </div>
+                  )}
+                  {projectForm.cover_image && !getImagePreviewUrl(projectForm.cover_image) && (
+                    <p className="image-url-error">
+                      {lang === 'ar' ? 'رابط صورة الغلاف غير صالح.' : 'The cover image URL is invalid.'}
+                    </p>
                   )}
                 </div>
 
@@ -1021,7 +1149,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   >
                     {t('cancel')}
                   </button>
-                  <button type="submit" disabled={loading} className="btn-gold">
+                  <button type="submit" disabled={loading || uploadingImage} className="btn-gold">
                     {loading ? t('uploading') : t('save')}
                   </button>
                 </div>
@@ -1076,12 +1204,17 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   <label>{t('cover_image')} (Google Drive / Direct URL)</label>
                   <div className="cover-upload-flex">
                     <input
-                      type="url"
+                      type="text"
                       placeholder="https://..."
                       value={equipmentForm.image_url}
-                      onChange={(e) =>
-                        setEquipmentForm({ ...equipmentForm, image_url: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setEquipmentForm({ ...equipmentForm, image_url: e.target.value });
+                        setEquipmentUploadFailed(false);
+                      }}
+                      onBlur={(e) => {
+                        const previewUrl = getImagePreviewUrl(e.target.value);
+                        if (previewUrl) setEquipmentForm((prev) => ({ ...prev, image_url: previewUrl }));
+                      }}
                       className="admin-input"
                     />
                     <label className="btn-upload-file">
@@ -1094,18 +1227,28 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) =>
-                              setEquipmentForm((prev) => ({ ...prev, image_url: url }))
-                            );
+                              setEquipmentForm((prev) => ({ ...prev, image_url: normalizeImageUrl(url) })),
+                            () => setEquipmentUploadFailed(true),
+                            () => {
+                              setEquipmentForm((prev) => ({ ...prev, image_url: '' }));
+                              setEquipmentUploadFailed(false);
+                            });
                           }
+                          e.target.value = '';
                         }}
                         style={{ display: 'none' }}
                       />
                     </label>
                   </div>
-                  {equipmentForm.image_url && (
+                  {getImagePreviewUrl(equipmentForm.image_url) && (
                     <div className="preview-box">
-                      <img src={equipmentForm.image_url} alt="Equipment Preview" />
+                      <img src={getImagePreviewUrl(equipmentForm.image_url)} alt="Equipment Preview" />
                     </div>
+                  )}
+                  {equipmentForm.image_url && !getImagePreviewUrl(equipmentForm.image_url) && (
+                    <p className="image-url-error">
+                      {lang === 'ar' ? 'رابط صورة المعدة غير صالح.' : 'The equipment image URL is invalid.'}
+                    </p>
                   )}
                 </div>
 

@@ -1846,6 +1846,42 @@
   margin-bottom: 24px;
 }
 
+.gallery-image-link-form {
+  margin: -4px 0 24px;
+}
+
+.gallery-image-link-form > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.gallery-image-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.gallery-image-link-row .admin-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.gallery-image-link-row .btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.image-url-error {
+  margin: 8px 0 0;
+  color: #f08080;
+  font-size: 0.82rem;
+}
+
 .dropzone-label {
   display: flex;
   flex-direction: column;
@@ -2112,6 +2148,12 @@
 .cover-upload-flex {
   display: flex;
   gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .gallery-image-link-row {
+    flex-direction: column;
+  }
 }
 
 .cover-upload-flex input {
