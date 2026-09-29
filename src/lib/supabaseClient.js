@@ -501,26 +501,30 @@ export async function uploadImageToGoogleDrive(file, folderId = null) {
     });
 
     if (response.ok) {
-      const result = await response.json();
-      return {
-        success: true,
-        imageUrl: result.imageUrl || result.fallbackUrl,
-        fileId: result.fileId,
-        source: 'google_drive',
-      };
-    } else {
-      const errData = await response.json().catch(() => ({}));
-      console.warn('Netlify function upload returned:', errData);
-      
-      // If we are in local development without netlify-cli running the function,
-      // fallback to creating a preview URL or object URL so user workflow isn't blocked!
-      return {
-        success: true,
-        imageUrl: base64Data, // Data URI preview fallback
-        source: 'local_preview',
-        notice: 'تم حفظ الصورة كمعاينة محلية لأن Netlify Function غير متاح في بيئة Vite المحلية بدون `netlify dev`.',
-      };
-    }
+  const result = await response.json();
+
+  if (!result.success || !result.imageUrl) {
+    throw new Error(
+      result.error || 'لم يتم الحصول على رابط الصورة من Google Drive'
+    );
+  }
+
+  return {
+    success: true,
+    imageUrl: result.imageUrl,
+    fileId: result.fileId,
+    source: 'google_drive',
+  };
+} else {
+  const errData = await response.json().catch(() => ({}));
+
+  console.error('Netlify function upload failed:', errData);
+
+  throw new Error(
+    errData?.error ||
+      `فشل رفع الصورة إلى Google Drive (${response.status})`
+  );
+}
   } catch (err) {
     console.warn('Network call to Netlify function failed (normal in offline/local Vite dev):', err);
     return {

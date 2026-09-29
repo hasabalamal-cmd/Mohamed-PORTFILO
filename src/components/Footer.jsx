@@ -191,15 +191,15 @@ export default function Footer({ t }) {
 
               <li>
                 <Phone size={17} className="contact-icon text-gold" />
-                <a href="tel:+9665557439682">
-                  +966 5557439682
+                <a href="tel:+966557439682">
+                  +966 557439682
                 </a>
               </li>
 
               <li>
                 <Mail size={17} className="contact-icon text-gold" />
-                <a href="mailto:hello@mfmvcs.com">
-                  hello@mfmvcs.com
+                <a href="mailto:mohammedfuad17.8@gmail.com">
+                  mohammedfuad17.8@gmail.com
                 </a>
               </li>
 
