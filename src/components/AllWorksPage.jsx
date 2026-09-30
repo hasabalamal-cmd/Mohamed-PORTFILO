@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   ImageOff,
 } from 'lucide-react';
+import { getGoogleDriveImageUrl } from '../lib/imageUrl';
 
 const PAGE_SIZE = 9;
 
@@ -218,7 +219,13 @@ export default function AllWorksPage({
                     aria-label={`${project.name} — ${t('view_project_photos')}`}
                   >
                     <span className="work-card-media">
-                      <img src={project.cover_image} alt={project.name} loading="lazy" />
+                      <img
+                        src={project.cover_image
+                          ? getGoogleDriveImageUrl(project.cover_image)
+                          : 'https://via.placeholder.com/600x400'}
+                        alt={project.name}
+                        loading="lazy"
+                      />
                       <span className="work-card-count">
                         <ImageIcon size={13} /> {photos}
                       </span>

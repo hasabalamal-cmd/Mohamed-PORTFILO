@@ -14,6 +14,10 @@ import {
   Check,
 } from 'lucide-react';
 import { getProjectImages } from '../lib/supabaseClient';
+import {
+  getGoogleDriveImagePreviewFallback,
+  getGoogleDriveImageUrl,
+} from '../lib/imageUrl';
 
 const MAX_SCALE = 4;
 const ZOOM_STEP = 1.7;
@@ -21,6 +25,13 @@ const DOUBLE_TAP_MS = 300;
 const SWIPE_MIN = 45;
 
 const clamp = (value, limit) => Math.min(limit, Math.max(-limit, value));
+
+const handleDriveImageError = (event) => {
+  const fallbackUrl = getGoogleDriveImagePreviewFallback(event.currentTarget.src);
+  if (fallbackUrl && event.currentTarget.src !== fallbackUrl) {
+    event.currentTarget.src = fallbackUrl;
+  }
+};
 
 export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
   const [images, setImages] = useState([]);
@@ -118,7 +129,7 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
     [images[(index + 1) % total], images[(index - 1 + total) % total]].forEach((img) => {
       if (img?.image_url) {
         const preloader = new Image();
-        preloader.src = img.image_url;
+        preloader.src = getGoogleDriveImageUrl(img.image_url);
       }
     });
     return undefined;
@@ -385,7 +396,7 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
           <button
             type="button"
             className="pgv-tool"
-            onClick={() => current?.image_url && window.open(current.image_url, '_blank', 'noopener')}
+            onClick={() => current?.image_url && window.open(getGoogleDriveImageUrl(current.image_url), '_blank', 'noopener')}
             disabled={!current}
             aria-label={t('open_original')}
             title={t('open_original')}
@@ -457,9 +468,10 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
                 <img
                   key={current.id}
                   className={`pgv-image${scale > 1 ? ' is-zoomed' : ''}`}
-                  src={current.image_url}
+                  src={getGoogleDriveImageUrl(current.image_url)}
                   alt={`${project.name} — ${t('photo')} ${index + 1}`}
                   draggable="false"
+                  onError={handleDriveImageError}
                   style={{
                     transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
                     transition: dragging ? 'none' : undefined,
@@ -537,7 +549,12 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
                   }}
                   aria-label={`${t('photo')} ${i + 1}`}
                 >
-                  <img src={img.image_url} alt="" loading="lazy" />
+                  <img
+                    src={getGoogleDriveImageUrl(img.image_url)}
+                    alt=""
+                    loading="lazy"
+                    onError={handleDriveImageError}
+                  />
                   <span className="pgv-grid-index">{i + 1}</span>
                 </button>
               ))}
@@ -560,7 +577,12 @@ export default function ProjectGalleryViewer({ project, onClose, t, lang }) {
               aria-label={`${t('photo')} ${i + 1}`}
               aria-current={i === index}
             >
-              <img src={img.image_url} alt="" loading="lazy" />
+              <img
+                src={getGoogleDriveImageUrl(img.image_url)}
+                alt=""
+                loading="lazy"
+                onError={handleDriveImageError}
+              />
             </button>
           ))}
         </div>

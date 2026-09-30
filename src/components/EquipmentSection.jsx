@@ -1,5 +1,6 @@
 import React from 'react';
 import { Aperture, CheckCircle2 } from 'lucide-react';
+import { getGoogleDriveImageUrl } from '../lib/imageUrl';
 
 export default function EquipmentSection({ equipment = [], t }) {
   if (!equipment || equipment.length === 0) return null;
@@ -17,7 +18,7 @@ export default function EquipmentSection({ equipment = [], t }) {
             <div key={item.id} className="equipment-card">
               <div className="equipment-image-container">
                 <img
-                  src={item.image_url || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80'}
+                  src={getGoogleDriveImageUrl(item.image_url || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80')}
                   alt={item.name}
                   loading="lazy"
                 />

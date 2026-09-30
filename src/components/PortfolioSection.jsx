@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Eye, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { getGoogleDriveImageUrl } from '../lib/imageUrl';
 
 export default function PortfolioSection({
   categories = [],
@@ -70,7 +71,9 @@ export default function PortfolioSection({
                 <span
                   className="card-bg-image"
                   style={{
-                    backgroundImage: `url(${proj.cover_image})`,
+                    backgroundImage: proj.cover_image
+                      ? `url("${getGoogleDriveImageUrl(proj.cover_image)}")`
+                      : 'none',
                   }}
                 />
 

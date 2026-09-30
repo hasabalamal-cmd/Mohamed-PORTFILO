@@ -59,18 +59,17 @@
 
 ---
 
-## ☁️ 2. نظام رفع وتخزين الصور (Google Drive Flow)
+## ☁️ 2. نظام رفع وتخزين الصور (Google Apps Script Flow)
 
-المسار الأمني الصارم:
+مسار رفع الصور المستخدم من لوحة الإدارة:
 ```text
-Frontend (React) ──> Netlify Function ──> Google Drive API ──> رفع الصورة وحفظ الرابط ──> Supabase
+Frontend (React) ──> ضغط JPEG ──> Google Apps Script Web App ──> Google Drive ──> رابط الصورة ──> Supabase
 ```
 
-- الملف التنفيذي: [`netlify/functions/upload-to-drive.js`](file:///d:/MOHMMED/netlify/functions/upload-to-drive.js).
-- يتم إرسال الصورة المشفرة Base64 من المتصفح إلى Netlify Function (Server-Side).
-- تقوم الدالة بالاتصال بـ Google Drive API v3 عبر **Service Account** (أو OAuth2 Refresh Token) بصلاحيات سرية على الخادم دون تسريب أي مفاتيح للمتصفح.
-- يتم إعداد إذن الملف ليصبح قابلاً للعرض العام وتوليد رابط Google CDN مباشر وسريع:
-  `https://lh3.googleusercontent.com/d/{FILE_ID}`
+- يضغط المتصفح الصور بصيغة JPEG (حد أقصى 4000×4000، جودة 0.92) ثم يرسل JSON يحتوي `fileName` و`mimeType` و`base64Data` إلى رابط Apps Script المحدد في `VITE_GOOGLE_APPS_SCRIPT_URL`.
+- يستقبل Apps Script بيانات Base64 المؤقتة ويرفع الملف إلى Google Drive؛ لا تُحفظ بيانات Base64 في Supabase.
+- تحفظ قاعدة البيانات رابط الصورة فقط، ويُحوّل رابط Google Drive إلى رابط عرض مباشر عند عرضه في الموقع.
+- دالة Netlify القديمة `netlify/functions/upload-to-drive.mjs` وبيانات Service Account ما زالت موجودة كمسار قديم، لكنها لم تعد مستخدمة من لوحة الإدارة.
 - يتم تخزين الرابط النصي فقط في Supabase (`cover_image` / `image_url`).
 
 ---
@@ -109,6 +108,7 @@ Frontend (React) ──> Netlify Function ──> Google Drive API ──> رف�
    ```env
    VITE_SUPABASE_URL=https://your-project.supabase.co
    VITE_SUPABASE_ANON_KEY=your_anon_key_here
+   VITE_GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/DEPLOYMENT_ID/exec
    ```
 3. شغل خادم التطوير:
    ```bash
@@ -125,7 +125,5 @@ Frontend (React) ──> Netlify Function ──> Google Drive API ──> رف�
 4. في **Site configuration -> Environment variables**، أضف المتغيرات:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-   - `GOOGLE_PRIVATE_KEY`
-   - `GOOGLE_DRIVE_FOLDER_ID`
+   - `VITE_GOOGLE_APPS_SCRIPT_URL` (رابط Web App المنشور المنتهي بـ `/exec`)
 5. اضغط **Deploy Site**!

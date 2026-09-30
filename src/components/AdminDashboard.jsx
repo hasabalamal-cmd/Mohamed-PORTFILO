@@ -34,18 +34,18 @@ import {
   createEquipment,
   updateEquipment,
   deleteEquipment,
-  uploadImageToGoogleDrive,
   isSupabaseConfigured,
 } from '../lib/supabaseClient';
 import {
+  getGoogleDriveImageUrl,
   getGoogleDriveImagePreviewFallback,
-  normalizeGoogleDriveImageUrl,
 } from '../lib/imageUrl';
+import { uploadImageToGoogleAppsScript } from '../lib/googleAppsScript';
 
 const getImagePreviewUrl = (value) => {
   if (!value?.trim()) return '';
   try {
-    return normalizeGoogleDriveImageUrl(value);
+    return getGoogleDriveImageUrl(value);
   } catch {
     return '';
   }
@@ -188,7 +188,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     let coverImage;
     try {
       coverImage = projectForm.cover_image.trim()
-        ? normalizeGoogleDriveImageUrl(projectForm.cover_image)
+        ? getGoogleDriveImageUrl(projectForm.cover_image)
         : '';
     } catch (err) {
       showNotice('error', err.message || (lang === 'ar' ? 'رابط صورة الغلاف غير صالح' : 'Invalid cover image URL'));
@@ -256,14 +256,14 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const res = await uploadImageToGoogleDrive(file);
-        if (res.success !== true || res.source !== 'google_drive' || !res.imageUrl) {
-          throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Drive' : 'Google Drive did not return an image URL');
+        const res = await uploadImageToGoogleAppsScript(file);
+        if (res.success !== true || !res.imageUrl) {
+          throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Apps Script' : 'Google Apps Script did not return an image URL');
         }
         const nextOrder = projectImages.length + i;
         await addProjectImage({
           project_id: activeProjectId,
-          image_url: res.imageUrl,
+          image_url: getGoogleDriveImageUrl(res.imageUrl),
           sort_order: nextOrder,
         });
       }
@@ -272,6 +272,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
       setProjectImages(updatedImgs);
       if (onDataChanged) onDataChanged();
     } catch (err) {
+      console.error('Project gallery image upload failed:', err);
       showNotice('error', err.message || (lang === 'ar' ? 'فشل رفع الصور' : 'Failed to upload images'));
     } finally {
       setUploadingImage(false);
@@ -288,7 +289,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
 
     let imageUrl;
     try {
-      imageUrl = normalizeGoogleDriveImageUrl(galleryImageUrl);
+      imageUrl = getGoogleDriveImageUrl(galleryImageUrl);
     } catch (err) {
       showNotice('error', err.message || (lang === 'ar' ? 'رابط الصورة غير صالح' : 'Invalid image URL'));
       return;
@@ -446,16 +447,16 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
     onUploadStart();
     setUploadingImage(true);
     try {
-      const res = await uploadImageToGoogleDrive(file);
-      if (res.success !== true || res.source !== 'google_drive' || !res.imageUrl) {
-        throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Drive' : 'Google Drive did not return an image URL');
+      const res = await uploadImageToGoogleAppsScript(file);
+      if (res.success !== true || !res.imageUrl) {
+        throw new Error(lang === 'ar' ? 'لم يتم استلام رابط الصورة من Google Apps Script' : 'Google Apps Script did not return an image URL');
       }
-      onUploaded(res.imageUrl);
-      showNotice('success', lang === 'ar' ? 'تم رفع الصورة عبر الوسيط Google Drive' : 'Uploaded image via Google Drive proxy');
+      onUploaded(getGoogleDriveImageUrl(res.imageUrl));
+      showNotice('success', lang === 'ar' ? 'تم رفع الصورة إلى Google Drive' : 'Image uploaded to Google Drive');
     } catch (err) {
-      console.error('Cover image upload failed:', err);
+      console.error('Image upload failed:', err);
       onUploadError();
-      showNotice('error', err.message || (lang === 'ar' ? 'فشل رفع الصورة إلى Google Drive' : 'Failed to upload image to Google Drive'));
+      showNotice('error', lang === 'ar' ? 'فشل رفع الصورة، يرجى المحاولة مرة أخرى.' : 'Image upload failed. Please try again.');
     } finally {
       setUploadingImage(false);
     }
@@ -583,7 +584,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                       <tr key={proj.id}>
                         <td>
                           <img
-                            src={proj.cover_image || 'https://via.placeholder.com/60'}
+                            src={getGoogleDriveImageUrl(proj.cover_image || 'https://via.placeholder.com/60')}
                             alt={proj.name}
                             className="table-thumb"
                           />
@@ -672,7 +673,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
               {activeProjectObj && (
                 <div className="active-project-bar">
                   <img
-                    src={activeProjectObj.cover_image}
+                    src={getGoogleDriveImageUrl(activeProjectObj.cover_image || 'https://via.placeholder.com/60')}
                     alt={activeProjectObj.name}
                     className="active-project-thumb"
                   />
@@ -760,7 +761,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   <div key={img.id} className="admin-image-card">
                     <div className="image-card-preview">
                       <img
-                        src={img.image_url}
+                        src={getGoogleDriveImageUrl(img.image_url)}
                         alt={`Sort order ${img.sort_order}`}
                         onError={handleImagePreviewError}
                       />
@@ -920,7 +921,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                       <tr key={eq.id}>
                         <td>
                           <img
-                            src={eq.image_url || 'https://via.placeholder.com/60'}
+                            src={getGoogleDriveImageUrl(eq.image_url || 'https://via.placeholder.com/60')}
                             alt={eq.name}
                             className="table-thumb"
                           />
@@ -1000,12 +1001,12 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                   </div>
                   <div className="status-indicator-row">
                     <span className="status-dot dot-green" />
-                    <span>netlify/functions/upload-to-drive.mjs</span>
+                    <span>Google Apps Script Web App</span>
                   </div>
                   <p className="status-desc">
                     {lang === 'ar' 
-                      ? 'يرسل Frontend ملفات الصور مباشرة بصيغة multipart/form-data إلى Netlify Function، ثم تُرفع إلى Google Drive ويُحفظ رابط الصورة في Supabase.'
-                      : 'Frontend sends image files directly as multipart/form-data to the Netlify Function, which uploads them to Google Drive and saves their URLs in Supabase.'}
+                      ? 'تُضغط الصور في المتصفح ثم تُرسل إلى Google Apps Script Web App لرفعها إلى Google Drive. يُحفظ رابط الصورة فقط في Supabase.'
+                      : 'Images are compressed in the browser and sent to the Google Apps Script Web App for Drive upload. Only the image URL is saved in Supabase.'}
                   </p>
                 </div>
               </div>
@@ -1088,7 +1089,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) => {
-                              setProjectForm((prev) => ({ ...prev, cover_image: normalizeGoogleDriveImageUrl(url) }));
+                              setProjectForm((prev) => ({ ...prev, cover_image: getGoogleDriveImageUrl(url) }));
                               setCoverUploadFailed(false);
                             }, () => setCoverUploadFailed(true), () => {
                               setProjectForm((prev) => ({ ...prev, cover_image: '' }));
@@ -1249,7 +1250,7 @@ export default function AdminDashboard({ onClose, onDataChanged, onLogout, t, la
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
                             handleSingleUpload(e.target.files[0], (url) =>
-                              setEquipmentForm((prev) => ({ ...prev, image_url: normalizeGoogleDriveImageUrl(url) })),
+                              setEquipmentForm((prev) => ({ ...prev, image_url: getGoogleDriveImageUrl(url) })),
                             () => setEquipmentUploadFailed(true),
                             () => {
                               setEquipmentForm((prev) => ({ ...prev, image_url: '' }));

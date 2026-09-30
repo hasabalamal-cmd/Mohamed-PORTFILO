@@ -5,7 +5,7 @@ import {
   INITIAL_PROJECT_IMAGES,
   INITIAL_EQUIPMENT,
 } from './initialSeed';
-import { normalizeGoogleDriveImageUrl } from './imageUrl';
+import { getGoogleDriveImageUrl } from './imageUrl';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabasePublishableKey =
@@ -207,7 +207,7 @@ export async function getProjectById(id) {
 export async function createProject({ name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
-  const normalizedCoverImage = cover_image ? normalizeGoogleDriveImageUrl(cover_image) : null;
+  const normalizedCoverImage = cover_image ? getGoogleDriveImageUrl(cover_image) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -245,7 +245,7 @@ export async function createProject({ name, category_id, cover_image }) {
 export async function updateProject(id, { name, category_id, cover_image }) {
   if (!name || !name.trim()) throw new Error('اسم المشروع مطلوب');
   if (!category_id) throw new Error('يجب اختيار التصنيف');
-  const normalizedCoverImage = cover_image ? normalizeGoogleDriveImageUrl(cover_image) : null;
+  const normalizedCoverImage = cover_image ? getGoogleDriveImageUrl(cover_image) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -338,7 +338,7 @@ export async function getAllProjectImages() {
 
 export async function addProjectImage({ project_id, image_url, sort_order = 0 }) {
   if (!project_id || !image_url) throw new Error('بيانات الصورة غير مكتملة');
-  const normalizedImageUrl = normalizeGoogleDriveImageUrl(image_url);
+  const normalizedImageUrl = getGoogleDriveImageUrl(image_url);
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -416,7 +416,7 @@ export async function getEquipment() {
 
 export async function createEquipment({ name, model, image_url }) {
   if (!name || !name.trim()) throw new Error('اسم المعدة مطلوب');
-  const normalizedImageUrl = image_url ? normalizeGoogleDriveImageUrl(image_url) : null;
+  const normalizedImageUrl = image_url ? getGoogleDriveImageUrl(image_url) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -443,7 +443,7 @@ export async function createEquipment({ name, model, image_url }) {
 
 export async function updateEquipment(id, { name, model, image_url }) {
   if (!name || !name.trim()) throw new Error('اسم المعدة مطلوب');
-  const normalizedImageUrl = image_url ? normalizeGoogleDriveImageUrl(image_url) : null;
+  const normalizedImageUrl = image_url ? getGoogleDriveImageUrl(image_url) : null;
 
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -477,149 +477,4 @@ export async function deleteEquipment(id) {
     items.filter((item) => item.id !== id)
   );
   return true;
-}
-
-// ============================================================================
-// GOOGLE DRIVE UPLOAD VIA NETLIFY FUNCTION
-// ============================================================================
-const MAX_NETLIFY_IMAGE_SIZE = 4 * 1024 * 1024;
-
-async function prepareImageForUpload(file) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('يجب اختيار ملف صورة صالح');
-  }
-  if (file.size <= MAX_NETLIFY_IMAGE_SIZE) return file;
-
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch (error) {
-    console.error('Could not decode large image for upload:', error);
-    throw new Error('تعذر تجهيز الصورة الكبيرة للرفع');
-  }
-
-  try {
-    const canvas = document.createElement('canvas');
-    const maxDimension = 2560;
-    let scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
-
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      canvas.width = Math.max(1, Math.floor(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.floor(bitmap.height * scale));
-
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('تعذر تجهيز الصورة للرفع');
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-      for (const quality of [0.86, 0.76, 0.66, 0.56]) {
-        const blob = await new Promise((resolve, reject) => {
-          canvas.toBlob(
-            (result) => {
-              if (result) resolve(result);
-              else reject(new Error('تعذر ضغط الصورة للرفع'));
-            },
-            'image/webp',
-            quality,
-          );
-        });
-
-        if (blob.size <= MAX_NETLIFY_IMAGE_SIZE) {
-          const extensionByType = {
-            'image/webp': '.webp',
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-          };
-          const extension = extensionByType[blob.type];
-          if (!extension) throw new Error('تعذر إنشاء نسخة صورة صالحة للرفع');
-          const fileName = file.name.replace(/\.[^.]*$/, '') + extension;
-          return new File([blob], fileName, {
-            type: blob.type,
-            lastModified: Date.now(),
-          });
-        }
-      }
-
-      scale *= 0.75;
-    }
-  } finally {
-    bitmap.close();
-  }
-
-  throw new Error('تعذر ضغط الصورة إلى الحجم المسموح به للرفع');
-}
-
-export async function uploadImageToGoogleDrive(file, folderId = null) {
-  if (!file) throw new Error('لم يتم تحديد أي ملف');
-  const uploadFile = await prepareImageForUpload(file);
-
-  const uploadEndpoint = '/.netlify/functions/upload-to-drive';
-  const formData = new FormData();
-  formData.append('file', uploadFile, uploadFile.name);
-  if (folderId) formData.append('folderId', folderId);
-
-  let response;
-  try {
-    response = await fetch(uploadEndpoint, {
-      method: 'POST',
-      body: formData,
-    });
-  } catch (error) {
-    console.error('Google Drive upload request failed:', error);
-    throw new Error(`تعذر الاتصال بخدمة رفع Google Drive: ${error.message}`);
-  }
-
-  const responseText = await response.text();
-  let result;
-  try {
-    result = JSON.parse(responseText);
-  } catch {
-    if (response.status === 413) {
-      throw new Error('الصورة أكبر من الحد المسموح به لخدمة الرفع. حاول اختيار صورة أصغر.');
-    }
-    throw new Error(
-      `استجابة خدمة رفع Google Drive غير صالحة (${response.status})`,
-    );
-  }
-
-  if (!response.ok) {
-    console.error('Netlify function upload failed:', result);
-    if (response.status === 413) {
-      throw new Error('الصورة أكبر من الحد المسموح به لخدمة الرفع. حاول اختيار صورة أصغر.');
-    }
-    throw new Error(
-      result?.error || `فشل رفع الصورة إلى Google Drive (${response.status})`,
-    );
-  }
-
-  if (
-    result?.success !== true ||
-    typeof result.imageUrl !== 'string' ||
-    typeof result.fileId !== 'string' ||
-    !result.fileId
-  ) {
-    throw new Error(
-      result?.error || 'لم تُرجع خدمة Google Drive رابطاً صالحاً للصورة',
-    );
-  }
-
-  let imageUrl;
-  try {
-    imageUrl = new URL(result.imageUrl);
-  } catch {
-    throw new Error('أعادت خدمة Google Drive رابط صورة غير صالح');
-  }
-
-  if (
-    imageUrl.protocol !== 'https:' ||
-    !['lh3.googleusercontent.com', 'drive.google.com'].includes(imageUrl.hostname)
-  ) {
-    throw new Error('أعادت خدمة Google Drive رابطاً لا يشير إلى Google Drive');
-  }
-
-  return {
-    success: true,
-    imageUrl: imageUrl.href,
-    fileId: result.fileId,
-    source: 'google_drive',
-  };
 }
